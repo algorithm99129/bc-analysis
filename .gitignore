@@ -1,0 +1,9 @@
+# Local settings and secrets (proxy login)
+.env
+
+# Runtime data written by the server (saved round times)
+data/
+
+node_modules/
+*.tmp
+*.tmp.*

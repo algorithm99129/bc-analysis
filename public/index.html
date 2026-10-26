@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Crash Live Analysis</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23d95926'/%3E%3Cpath d='M6 24 L13 15 L18 19 L26 8' stroke='white' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="is-loading">
+  <header class="top">
+    <div class="brand">
+      <svg class="logo" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8"/><path d="M6 24 L13 15 L18 19 L26 8"/></svg>
+      <h1>Crash Live Analysis</h1>
+      <span id="status" class="status"><i></i><span>Connecting…</span></span>
+    </div>
+    <div class="top-controls">
+      <label class="field" data-tip="How many of the most recent rounds every panel analyses">
+        <span>Sample</span>
+        <select id="winSel"></select>
+      </label>
+      <button id="notifyBtn" class="btn notify-btn" data-state="default">Enable desktop alerts</button>
+      <button id="soundBtn" class="icon-btn" aria-pressed="true" data-tip="Alert sound on/off">🔊</button>
+      <button id="resetLayout" class="btn ghost" data-tip="Restore the default panel order and widths">Reset layout</button>
+      <div class="latest">
+        <span class="muted">Latest</span>
+        <span id="latestId" class="mono">—</span>
+        <span id="latestRate" class="pill big">—</span>
+      </div>
+    </div>
+  </header>
+
+  <section class="strip" id="strip" aria-label="Most recent results"></section>
+
+  <div id="loading" class="loading" role="status"><span class="spinner"></span><span>Loading round history from BC.Game…</span></div>
+
+  <main id="board" class="board">
+
+    <article class="card" data-card="focusA" data-span="4">
+      <header class="card-head">
+        <span class="grip" data-tip="Drag to move">⠿</span>
+        <h2>Tracker</h2>
+        <div class="tools">
+          <select class="focus-target" aria-label="Tracked target"></select>
+          <button class="icon-btn bell" aria-pressed="false" data-tip="Alert me when this target hits">🔔</button>
+          <button class="icon-btn size" data-tip="Change panel width">⇔</button>
+        </div>
+      </header>
+      <div class="card-body focus-body"></div>
+    </article>
+
+    <article class="card" data-card="focusB" data-span="4">
+      <header class="card-head">
+        <span class="grip" data-tip="Drag to move">⠿</span>
+        <h2>Tracker</h2>
+        <div class="tools">
+          <select class="focus-target" aria-label="Tracked target"></select>
+          <button class="icon-btn bell" aria-pressed="false" data-tip="Alert me when this target hits">🔔</button>
+          <button class="icon-btn size" data-tip="Change panel width">⇔</button>
+        </div>
+      </header>
+      <div class="card-body focus-body"></div>
+    </article>
+
+    <article class="card" data-card="overview" data-span="4">
+      <header class="card-head">
+        <span class="grip" data-tip="Drag to move">⠿</span>
+        <h2>Overview</h2>
+        <div class="tools">
+          <a class="btn ghost small" id="csvLink" href="/api/history.csv" download data-tip="Download the sample as CSV">CSV</a>
+          <button class="icon-btn size" data-tip="Change panel width">⇔</button>
+        </div>
+      </header>
+      <div class="card-body"><div class="tiles" id="tiles"></div></div>
+    </article>
+
+    <article class="card" data-card="chart" data-span="12">
+      <header class="card-head">
+        <span class="grip" data-tip="Drag to move">⠿</span>
+        <h2>Rounds <span id="chartRangeLabel" class="muted mono"></span></h2>
+        <span id="liveBadge" class="badge">LIVE</span>
+        <div class="tools">
+          <div class="legend">
+            <span><i class="sw lo"></i><span id="legLo">&lt; 100×</span></span>
+            <span><i class="sw hi"></i><span id="legHi">≥ 100×</span></span>
+            <span><i class="sw one"></i>= 1.00×</span>
+          </div>
+          <div class="seg mode">
+            <button id="modePan" aria-pressed="true" data-tip="Drag moves the chart">✋ Pan</button>
+            <button id="modeSelect" aria-pressed="false" data-tip="Drag picks a range to measure its density (or hold Shift while dragging in Pan mode)">⬚ Select</button>
+          </div>
+          <div class="seg">
+            <button id="zoomOut" data-tip="Show more rounds">−</button>
+            <button id="zoomIn" data-tip="Show fewer rounds">+</button>
+            <button id="goLive" data-tip="Jump back to the newest rounds">Live</button>
+          </div>
+          <button class="icon-btn size" data-tip="Change panel width">⇔</button>
+        </div>
+      </header>
+      <div class="card-body">
+        <div class="chart" id="chart"><canvas id="chartCanvas"></canvas></div>
+        <input id="chartScroll" class="scroll" type="range" min="0" max="0" value="0" aria-label="Scroll through history">
+        <p class="hint">Drag to pan · <kbd>Shift</kbd>+drag or ⬚ Select to measure a range · wheel to zoom · double-click for live ·
+          keys: <kbd>P</kbd> pan <kbd>S</kbd> select <kbd>L</kbd> live <kbd>+</kbd>/<kbd>−</kbd> zoom <kbd>Esc</kbd> clear selection</p>
+
+        <section class="density" aria-label="Density of the selected range">
+          <div class="density-head">
+            <h3>Range density</h3>
+            <label class="field">From # <input id="selFrom" class="id-in" type="number" step="1" placeholder="round"></label>
+            <label class="field">to # <input id="selTo" class="id-in" type="number" step="1" placeholder="round"></label>
+            <button id="selVisible" class="btn small" data-tip="Select every round currently shown on the chart">Visible rounds</button>
+            <button id="selLast" class="btn small" data-tip="Select the last Sample-size rounds (header setting)">Sample</button>
+            <button id="selClear" class="btn small ghost">Clear</button>
+          </div>
+          <p class="density-summary" id="densitySummary"></p>
+          <div class="table-wrap" id="densityBody" hidden>
+            <table class="dens">
+              <thead><tr>
+                <th>Target</th>
+                <th data-tip="Hits in the range, and the number expected from the default chance">Hits / exp.</th>
+                <th data-tip="Density = hits ÷ rounds in the range × 100">Density</th>
+                <th data-tip="Expected density = default chance per round (99% ÷ target; 1.98% for 1.00×)">Expected</th>
+                <th data-tip="Density minus expected, in percentage points">Diff</th>
+                <th data-tip="Density ÷ expected. ×1.00 = exactly as expected">Ratio</th>
+                <th data-tip="How unusual the difference is for this many rounds, in standard deviations. Within ±2σ is ordinary variation">Deviation</th>
+                <th data-tip="Bar = density in the range · line = expected">Density vs expected</th>
+              </tr></thead>
+              <tbody id="densityRows"></tbody>
+            </table>
+          </div>
+          <p class="note">Density = hits ÷ rounds × 100. In a short range large differences are normal; the Deviation column shows whether a difference is unusual for the range size.</p>
+        </section>
+      </div>
+    </article>
+
+    <article class="card" data-card="dev" data-span="12">
+      <header class="card-head">
+        <span class="grip" data-tip="Drag to move">⠿</span>
+        <h2>Deviation</h2>
+        <div class="tools">
+          <button id="devSync" class="btn toggle" aria-pressed="true"
+            data-tip="Show exactly the rounds on the Rounds chart, each point under its bar. Pan, zoom, select and hover move both charts">🔗 Sync with Rounds</button>
+          <select id="devMode" aria-label="Deviation mode" data-tip="Rolling: each point uses the last Sample-size rounds. Cumulative: everything from the start of the range">
+            <option value="roll">Rolling (sample window)</option>
+            <option value="cum">Cumulative from range start</option>
+          </select>
+          <select id="devRange" aria-label="Rounds shown"></select>
+          <button class="icon-btn size" data-tip="Change panel width">⇔</button>
+        </div>
+      </header>
+      <div class="card-body">
+        <div class="chips" id="devChips" aria-label="Targets to plot"></div>
+        <div class="chart dev-chart" id="devChart"><canvas id="devCanvas"></canvas></div>
+        <p class="hint" id="devHint"></p>
+        <p class="hint">Deviation = (hits − expected) ÷ standard deviation. Above 0: the target has hit more often than its default chance; below 0: less often.
+          Shaded bands mark ±1σ and ±2σ — inside ±2σ is ordinary variation.</p>
+      </div>
+    </article>
+
+    <article class="card" data-card="probs" data-span="8">
+      <header class="card-head">
+        <span class="grip" data-tip="Drag to move">⠿</span>
+        <h2>Probability board</h2>
+        <div class="tools">
+          <label class="field" data-tip="Default alert threshold for rows that don't have their own value in the Alert column">
+            Default alert <input id="alertPct" class="pct-in" type="number" min="1" max="500" step="1" value="95">% of adj. gap
+          </label>
+          <form id="addTarget" class="add-target">
+            <input id="targetIn" type="number" min="1" step="0.01" placeholder="Add target, e.g. 3">
+            <button class="btn small" type="submit">Add</button>
+          </form>
+          <button class="icon-btn size" data-tip="Change panel width">⇔</button>
+        </div>
+      </header>
+      <div class="card-body">
+        <div class="table-wrap">
+          <table class="probs">
+            <thead><tr>
+              <th data-tip="≥ x: round reaches at least x. = 1.00: round crashes instantly">Target</th>
+              <th data-tip="Default chance per round from the game's formula: 99% ÷ x (1.98% for an instant 1.00 crash)">Default</th>
+              <th data-tip="Average number of rounds between hits = 1 ÷ default chance">Avg every</th>
+              <th data-tip="Hits in the sample, and the expected number for this sample size">Hits / exp.</th>
+              <th data-tip="Observed share of rounds in the sample">Observed</th>
+              <th data-tip="How far the observed count is from expected, in standard deviations. Within ±2σ is normal noise">Deviation</th>
+              <th data-tip="Average gap × (observed rate ÷ default rate). Observed above default → longer gap expected; below → shorter">Adj. gap</th>
+              <th data-tip="Rounds since the most recent hit">Since</th>
+              <th data-tip="Chance a hit would have arrived within the rounds since the last one: 1 − (1 − p)^since. Rises every round without a hit">Due</th>
+              <th data-tip="Rounds left until the adjusted gap is reached (red = rounds past it)">Next in</th>
+              <th data-tip="Since ÷ adjusted gap: Early &lt; 0.5, Building &lt; 1, Due &lt; 2, Overdue ≥ 2">Status</th>
+              <th data-tip="Longest gap between hits in the sample">Longest</th>
+              <th data-tip="Alert threshold (% of Adj. gap) and on/off bell for this row. It fires once per gap when Since reaches the threshold. An empty box uses the default from the panel header">Alert</th>
+              <th></th>
+            </tr></thead>
+            <tbody id="probBody"></tbody>
+          </table>
+        </div>
+        <p class="note"><b>Default</b> = 99% ÷ target (1.98% for 1.00×), average gap = 1 ÷ default.
+          <b>Adj. gap</b> scales the average gap by observed ÷ default rate; <b>Due</b> grows each round since the last hit.
+          Note: the game's own chance for any single round stays at the Default value.</p>
+      </div>
+    </article>
+
+    <article class="card" data-card="analysis" data-span="4">
+      <header class="card-head">
+        <span class="grip" data-tip="Drag to move">⠿</span>
+        <h2>Analysis</h2>
+        <div class="tools">
+          <label class="field">payout &lt; <input id="inX" type="number" min="1.01" step="0.01" value="100"></label>
+          <button class="icon-btn size" data-tip="Change panel width">⇔</button>
+        </div>
+      </header>
+      <div class="card-body">
+        <table class="ranges">
+          <thead><tr>
+            <th>Range</th><th>Chance</th><th>Count</th>
+            <th data-tip="Longest run in a row inside this range">Max combo</th>
+            <th data-tip="Current run in a row">Now</th>
+          </tr></thead>
+          <tbody id="rangeBody"></tbody>
+        </table>
+        <div class="beads-head">
+          <span>Round</span><span id="colLo">[1, 100)</span><span id="colHi">[100, ∞)</span>
+        </div>
+        <div class="beads" id="beads"></div>
+        <nav class="pager">
+          <button id="prev" class="btn" aria-label="Previous page">‹</button>
+          <span><input id="pageIn" type="number" min="1" value="1"> of <span id="pageCount">1</span></span>
+          <button id="next" class="btn" aria-label="Next page">›</button>
+        </nav>
+      </div>
+    </article>
+  </main>
+
+  <footer class="foot">
+    <span>Data: BC.Game public crash history · older rounds rebuilt and verified from the provably-fair hash chain</span>
+    <span>Each round is independent — the per-round chance is always 99% ÷ target</span>
+  </footer>
+
+  <div id="tip" class="tip" hidden></div>
+  <div id="toasts" class="toasts" aria-live="polite"></div>
+  <script src="app.js"></script>
+</body>
+</html>

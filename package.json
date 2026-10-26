@@ -1,0 +1,13 @@
+{
+  "name": "bc-crash-analysis",
+  "version": "1.0.0",
+  "description": "Real-time BC.Game Crash history and analysis dashboard",
+  "main": "server.js",
+  "private": true,
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
