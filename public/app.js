@@ -110,6 +110,8 @@ function phase(m) {
 }
 
 const pillClass = (r) => (r < 1.01 ? 'one' : r >= S.payout ? 'hi' : '');
+// Inline icon from the sprite in index.html.
+const icon = (name) => `<svg class="ic" aria-hidden="true"><use href="#i-${name}"/></svg>`;
 const pill = (r, extra = '') => `<span class="pill ${pillClass(r)} ${extra}">${fmt(r)}</span>`;
 const sigma = (z) => `<span class="${Math.abs(z) < 2 ? 'dim' : z > 0 ? 'pos' : 'neg'}">${z >= 0 ? '+' : ''}${z.toFixed(1)}σ</span>`;
 
@@ -275,8 +277,8 @@ function renderProbs() {
           data-tip="Alert threshold for this row: ${pctX}% of Adj. gap = ${gap(at)} rounds.${custom ? '' : ' Using the default — type a value to override, clear it to go back to the default.'}">
           <input class="row-pct" type="number" min="1" max="500" step="1" data-x="${x}" value="${custom ? pctX : ''}" placeholder="${S.alertPct}" aria-label="Alert % for ${tlabel(x)}">%</span>
         <button class="icon-btn bell row-bell" aria-pressed="${on}" data-x="${x}"
-          data-tip="Alert ${on ? 'on' : 'off'}: notify when Since reaches ${pctX}% of Adj. gap (${gap(at)} rounds)">🔔</button></td>
-      <td><button class="del" data-x="${x}" data-tip="Remove target">×</button></td>
+          data-tip="Alert ${on ? 'on' : 'off'}: notify when Since reaches ${pctX}% of Adj. gap (${gap(at)} rounds)">${icon('bell')}</button></td>
+      <td><button class="del" data-x="${x}" aria-label="Remove target" data-tip="Remove target">${icon('x')}</button></td>
     </tr>`;
   }).join('');
 }
@@ -435,6 +437,7 @@ function renderChart() {
   const live = view.offset === 0;
   $('liveBadge').textContent = live ? 'LIVE' : `${int(view.offset)} rounds back`;
   $('liveBadge').classList.toggle('off', !live);
+  $('goLive').classList.toggle('is-live', live);
   const sc = $('chartScroll');
   sc.max = total - view.count;
   sc.value = total - view.count - view.offset;
@@ -680,7 +683,7 @@ function renderDev() {
     offset = view.offset;
     span = Math.min(view.count, games.length - offset);
     $('devHint').textContent = Math.abs($('chart').clientWidth - W) > 2
-      ? 'Give this panel the same width as the Rounds chart (⇔) so the rounds line up exactly.'
+      ? 'Give this panel the same width as the Rounds chart (width button, top right) so the rounds line up exactly.'
       : 'Synced with the Rounds chart: same rounds, same positions. Drag, zoom, select and hover work on both.';
   } else {
     const maxSpan = games.length - lead;
@@ -691,7 +694,7 @@ function renderDev() {
     offset = 0;
     span = Math.min(S.devRange, maxSpan);
     rsel.value = ranges.includes(span) ? span : maxSpan;
-    $('devHint').textContent = 'Not synced: showing its own range. Turn on 🔗 Sync to line it up with the Rounds chart.';
+    $('devHint').textContent = 'Not synced: showing its own range. Turn on Sync with Rounds to line it up with the Rounds chart.';
   }
 
   const dpr = devicePixelRatio || 1;
@@ -1037,7 +1040,7 @@ function strategyCard(c, rank) {
     </div>
     <footer>
       <span class="sub">${STAKING[c.rule.plan]}: ${stakeText(c)} · pays ×${c.pay}</span>
-      <button class="btn small st-track" data-i="${rank}">Track this plan</button>
+      <button class="btn small st-track" data-i="${rank}">${icon('crosshair')}Track plan</button>
     </footer>
   </article>`;
 }
@@ -1094,7 +1097,7 @@ function renderPlanBox() {
       <span>Returned <b>${money(st.returned)}</b></span>
       <span>P&amp;L <b class="${st.profit > 0 ? 'pos' : st.profit < 0 ? 'neg' : ''}">${signed(st.profit)}</b></span>
     </div>
-    <button class="btn small ghost" id="planStop">${st.status === 'won' || st.status === 'ended' ? 'Clear' : 'Stop tracking'}</button>`;
+    <button class="btn small ghost" id="planStop">${st.status === 'won' || st.status === 'ended' ? icon('x') + 'Clear' : icon('stop') + 'Stop tracking'}</button>`;
 }
 
 function renderStrategy() {

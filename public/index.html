@@ -11,6 +11,26 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body class="is-loading">
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <symbol id="i-hand" viewBox="0 0 24 24"><path d="M18 11V6a2 2 0 0 0-4 0"/><path d="M14 10V4a2 2 0 0 0-4 0v2"/><path d="M10 10.5V6a2 2 0 0 0-4 0v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-6-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></symbol>
+    <symbol id="i-select" viewBox="0 0 24 24"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M8 12h8"/></symbol>
+    <symbol id="i-zoom-in" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/><path d="M11 8v6"/><path d="M8 11h6"/></symbol>
+    <symbol id="i-zoom-out" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/><path d="M8 11h6"/></symbol>
+    <symbol id="i-width" viewBox="0 0 24 24"><path d="m18 8 4 4-4 4"/><path d="M2 12h20"/><path d="m6 8-4 4 4 4"/></symbol>
+    <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></symbol>
+    <symbol id="i-volume" viewBox="0 0 24 24"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a10 10 0 0 1 0 14"/></symbol>
+    <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></symbol>
+    <symbol id="i-sparkles" viewBox="0 0 24 24"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></symbol>
+    <symbol id="i-reset" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></symbol>
+    <symbol id="i-crosshair" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M22 12h-4"/><path d="M6 12H2"/><path d="M12 6V2"/><path d="M12 22v-4"/></symbol>
+    <symbol id="i-chev-left" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></symbol>
+    <symbol id="i-chev-right" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14"/><path d="M5 12h14"/></symbol>
+    <symbol id="i-stop" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/></symbol>
+    <symbol id="i-grip" viewBox="0 0 24 24"><g class="dots"><circle cx="9" cy="5" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="9" cy="19" r="1.6"/><circle cx="15" cy="5" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="15" cy="19" r="1.6"/></g></symbol>
+  </svg>
   <header class="top">
     <div class="brand">
       <svg class="logo" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8"/><path d="M6 24 L13 15 L18 19 L26 8"/></svg>
@@ -23,8 +43,8 @@
         <select id="winSel"></select>
       </label>
       <button id="notifyBtn" class="btn notify-btn" data-state="default">Enable desktop alerts</button>
-      <button id="soundBtn" class="icon-btn" aria-pressed="true" data-tip="Alert sound on/off">🔊</button>
-      <button id="resetLayout" class="btn ghost" data-tip="Restore the default panel order and widths">Reset layout</button>
+      <button id="soundBtn" class="icon-btn" aria-pressed="true" data-tip="Alert sound on/off"><svg class="ic" aria-hidden="true"><use href="#i-volume"/></svg></button>
+      <button id="resetLayout" class="btn ghost" data-tip="Restore the default panel order and widths"><svg class="ic" aria-hidden="true"><use href="#i-reset"/></svg>Reset layout</button>
       <div class="latest">
         <span class="muted">Latest</span>
         <span id="latestId" class="mono">—</span>
@@ -41,12 +61,12 @@
 
     <article class="card" data-card="focusA" data-span="4">
       <header class="card-head">
-        <span class="grip" data-tip="Drag to move">⠿</span>
+        <span class="grip" data-tip="Drag to move"><svg class="ic" aria-hidden="true"><use href="#i-grip"/></svg></span>
         <h2>Tracker</h2>
         <div class="tools">
           <select class="focus-target" aria-label="Tracked target"></select>
-          <button class="icon-btn bell" aria-pressed="false" data-tip="Alert me when this target hits">🔔</button>
-          <button class="icon-btn size" data-tip="Change panel width">⇔</button>
+          <button class="icon-btn bell" aria-pressed="false" data-tip="Alert me when this target hits"><svg class="ic" aria-hidden="true"><use href="#i-bell"/></svg></button>
+          <button class="icon-btn size" data-tip="Change panel width"><svg class="ic" aria-hidden="true"><use href="#i-width"/></svg></button>
         </div>
       </header>
       <div class="card-body focus-body"></div>
@@ -54,12 +74,12 @@
 
     <article class="card" data-card="focusB" data-span="4">
       <header class="card-head">
-        <span class="grip" data-tip="Drag to move">⠿</span>
+        <span class="grip" data-tip="Drag to move"><svg class="ic" aria-hidden="true"><use href="#i-grip"/></svg></span>
         <h2>Tracker</h2>
         <div class="tools">
           <select class="focus-target" aria-label="Tracked target"></select>
-          <button class="icon-btn bell" aria-pressed="false" data-tip="Alert me when this target hits">🔔</button>
-          <button class="icon-btn size" data-tip="Change panel width">⇔</button>
+          <button class="icon-btn bell" aria-pressed="false" data-tip="Alert me when this target hits"><svg class="ic" aria-hidden="true"><use href="#i-bell"/></svg></button>
+          <button class="icon-btn size" data-tip="Change panel width"><svg class="ic" aria-hidden="true"><use href="#i-width"/></svg></button>
         </div>
       </header>
       <div class="card-body focus-body"></div>
@@ -67,11 +87,11 @@
 
     <article class="card" data-card="overview" data-span="4">
       <header class="card-head">
-        <span class="grip" data-tip="Drag to move">⠿</span>
+        <span class="grip" data-tip="Drag to move"><svg class="ic" aria-hidden="true"><use href="#i-grip"/></svg></span>
         <h2>Overview</h2>
         <div class="tools">
-          <a class="btn ghost small" id="csvLink" href="/api/history.csv" download data-tip="Download the sample as CSV">CSV</a>
-          <button class="icon-btn size" data-tip="Change panel width">⇔</button>
+          <a class="btn ghost small" id="csvLink" href="/api/history.csv" download data-tip="Download the sample as CSV"><svg class="ic" aria-hidden="true"><use href="#i-download"/></svg>CSV</a>
+          <button class="icon-btn size" data-tip="Change panel width"><svg class="ic" aria-hidden="true"><use href="#i-width"/></svg></button>
         </div>
       </header>
       <div class="card-body"><div class="tiles" id="tiles"></div></div>
@@ -79,7 +99,7 @@
 
     <article class="card" data-card="strategy" data-span="12">
       <header class="card-head">
-        <span class="grip" data-tip="Drag to move">⠿</span>
+        <span class="grip" data-tip="Drag to move"><svg class="ic" aria-hidden="true"><use href="#i-grip"/></svg></span>
         <h2>Strategy generator</h2>
         <div class="tools">
           <label class="field" data-tip="Base stake per bet">Stake <input id="stStake" type="number" min="0.01" step="0.01" value="0.25"></label>
@@ -93,8 +113,8 @@
             <option value="history">Goal: best history</option>
             <option value="payout">Goal: biggest win (risk ≤ 60)</option>
           </select>
-          <button id="stGen" class="btn primary">Generate</button>
-          <button class="icon-btn size" data-tip="Change panel width">⇔</button>
+          <button id="stGen" class="btn primary"><svg class="ic" aria-hidden="true"><use href="#i-sparkles"/></svg>Generate</button>
+          <button class="icon-btn size" data-tip="Change panel width"><svg class="ic" aria-hidden="true"><use href="#i-width"/></svg></button>
         </div>
       </header>
       <div class="card-body">
@@ -112,7 +132,7 @@
 
     <article class="card" data-card="chart" data-span="12">
       <header class="card-head">
-        <span class="grip" data-tip="Drag to move">⠿</span>
+        <span class="grip" data-tip="Drag to move"><svg class="ic" aria-hidden="true"><use href="#i-grip"/></svg></span>
         <h2>Rounds <span id="chartRangeLabel" class="muted mono"></span></h2>
         <span id="liveBadge" class="badge">LIVE</span>
         <div class="tools">
@@ -121,22 +141,22 @@
             <span><i class="sw hi"></i><span id="legHi">≥ 100×</span></span>
             <span><i class="sw one"></i>= 1.00×</span>
           </div>
-          <div class="seg mode">
-            <button id="modePan" aria-pressed="true" data-tip="Drag moves the chart">✋ Pan</button>
-            <button id="modeSelect" aria-pressed="false" data-tip="Drag picks a range to measure its density (or hold Shift while dragging in Pan mode)">⬚ Select</button>
+          <div class="seg mode" role="group" aria-label="Drag mode">
+            <button id="modePan" aria-pressed="true" data-tip="Drag moves the chart (P)"><svg class="ic" aria-hidden="true"><use href="#i-hand"/></svg>Pan</button>
+            <button id="modeSelect" aria-pressed="false" data-tip="Drag picks a range to measure its density (or hold Shift while dragging in Pan mode) (S)"><svg class="ic" aria-hidden="true"><use href="#i-select"/></svg>Select</button>
           </div>
           <div class="seg">
-            <button id="zoomOut" data-tip="Show more rounds">−</button>
-            <button id="zoomIn" data-tip="Show fewer rounds">+</button>
-            <button id="goLive" data-tip="Jump back to the newest rounds">Live</button>
+            <button id="zoomOut" class="seg-icon" aria-label="Zoom out" data-tip="Zoom out: show more rounds (−)"><svg class="ic" aria-hidden="true"><use href="#i-zoom-out"/></svg></button>
+            <button id="zoomIn" class="seg-icon" aria-label="Zoom in" data-tip="Zoom in: show fewer rounds (+)"><svg class="ic" aria-hidden="true"><use href="#i-zoom-in"/></svg></button>
+            <button id="goLive" data-tip="Jump back to the newest rounds (L)"><i class="live-dot"></i>Live</button>
           </div>
-          <button class="icon-btn size" data-tip="Change panel width">⇔</button>
+          <button class="icon-btn size" data-tip="Change panel width"><svg class="ic" aria-hidden="true"><use href="#i-width"/></svg></button>
         </div>
       </header>
       <div class="card-body">
         <div class="chart" id="chart"><canvas id="chartCanvas"></canvas></div>
         <input id="chartScroll" class="scroll" type="range" min="0" max="0" value="0" aria-label="Scroll through history">
-        <p class="hint">Drag to pan · <kbd>Shift</kbd>+drag or ⬚ Select to measure a range · wheel to zoom · double-click for live ·
+        <p class="hint">Drag to pan · <kbd>Shift</kbd>+drag or Select mode to measure a range · wheel to zoom · double-click for live ·
           keys: <kbd>P</kbd> pan <kbd>S</kbd> select <kbd>L</kbd> live <kbd>+</kbd>/<kbd>−</kbd> zoom <kbd>Esc</kbd> clear selection</p>
 
         <section class="density" aria-label="Density of the selected range">
@@ -171,17 +191,17 @@
 
     <article class="card" data-card="dev" data-span="12">
       <header class="card-head">
-        <span class="grip" data-tip="Drag to move">⠿</span>
+        <span class="grip" data-tip="Drag to move"><svg class="ic" aria-hidden="true"><use href="#i-grip"/></svg></span>
         <h2>Deviation</h2>
         <div class="tools">
           <button id="devSync" class="btn toggle" aria-pressed="true"
-            data-tip="Show exactly the rounds on the Rounds chart, each point under its bar. Pan, zoom, select and hover move both charts">🔗 Sync with Rounds</button>
+            data-tip="Show exactly the rounds on the Rounds chart, each point under its bar. Pan, zoom, select and hover move both charts"><svg class="ic" aria-hidden="true"><use href="#i-link"/></svg>Sync with Rounds</button>
           <select id="devMode" aria-label="Deviation mode" data-tip="Rolling: each point uses the last Sample-size rounds. Cumulative: everything from the start of the range">
             <option value="roll">Rolling (sample window)</option>
             <option value="cum">Cumulative from range start</option>
           </select>
           <select id="devRange" aria-label="Rounds shown"></select>
-          <button class="icon-btn size" data-tip="Change panel width">⇔</button>
+          <button class="icon-btn size" data-tip="Change panel width"><svg class="ic" aria-hidden="true"><use href="#i-width"/></svg></button>
         </div>
       </header>
       <div class="card-body">
@@ -195,7 +215,7 @@
 
     <article class="card" data-card="probs" data-span="8">
       <header class="card-head">
-        <span class="grip" data-tip="Drag to move">⠿</span>
+        <span class="grip" data-tip="Drag to move"><svg class="ic" aria-hidden="true"><use href="#i-grip"/></svg></span>
         <h2>Probability board</h2>
         <div class="tools">
           <label class="field" data-tip="Default alert threshold for rows that don't have their own value in the Alert column">
@@ -203,9 +223,9 @@
           </label>
           <form id="addTarget" class="add-target">
             <input id="targetIn" type="number" min="1" step="0.01" placeholder="Add target, e.g. 3">
-            <button class="btn small" type="submit">Add</button>
+            <button class="btn small" type="submit"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg>Add</button>
           </form>
-          <button class="icon-btn size" data-tip="Change panel width">⇔</button>
+          <button class="icon-btn size" data-tip="Change panel width"><svg class="ic" aria-hidden="true"><use href="#i-width"/></svg></button>
         </div>
       </header>
       <div class="card-body">
@@ -238,11 +258,11 @@
 
     <article class="card" data-card="analysis" data-span="4">
       <header class="card-head">
-        <span class="grip" data-tip="Drag to move">⠿</span>
+        <span class="grip" data-tip="Drag to move"><svg class="ic" aria-hidden="true"><use href="#i-grip"/></svg></span>
         <h2>Analysis</h2>
         <div class="tools">
           <label class="field">payout &lt; <input id="inX" type="number" min="1.01" step="0.01" value="100"></label>
-          <button class="icon-btn size" data-tip="Change panel width">⇔</button>
+          <button class="icon-btn size" data-tip="Change panel width"><svg class="ic" aria-hidden="true"><use href="#i-width"/></svg></button>
         </div>
       </header>
       <div class="card-body">
@@ -259,9 +279,9 @@
         </div>
         <div class="beads" id="beads"></div>
         <nav class="pager">
-          <button id="prev" class="btn" aria-label="Previous page">‹</button>
+          <button id="prev" class="icon-btn" aria-label="Previous page"><svg class="ic" aria-hidden="true"><use href="#i-chev-left"/></svg></button>
           <span><input id="pageIn" type="number" min="1" value="1"> of <span id="pageCount">1</span></span>
-          <button id="next" class="btn" aria-label="Next page">›</button>
+          <button id="next" class="icon-btn" aria-label="Next page"><svg class="ic" aria-hidden="true"><use href="#i-chev-right"/></svg></button>
         </nav>
       </div>
     </article>
