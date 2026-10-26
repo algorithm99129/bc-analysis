@@ -248,6 +248,44 @@ select:disabled { opacity: .45; }
 .chart.selecting { cursor: crosshair; }
 .seg.mode button[aria-pressed="true"] { background: var(--surface-3); border-color: var(--text-muted); }
 
+/* ----- strategy generator ----- */
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+.btn.primary:hover { filter: brightness(1.1); background: var(--accent); }
+#stStake, #stBudget { width: 72px; }
+#stPeriod, #stOnePay { width: 70px; }
+.st-meta { margin: 0 0 12px; font-size: 12px; color: var(--text-muted); }
+.warn-t { color: var(--warn); font-weight: 600; }
+.st-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 14px; }
+.st-card {
+  display: flex; flex-direction: column; gap: 12px; padding: 14px; border-radius: 12px;
+  background: var(--surface-2); border: 1px solid var(--border);
+}
+.st-card.st-top { border-color: color-mix(in srgb, var(--accent) 55%, transparent); box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 25%, transparent); }
+.st-card header { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.st-card h3 { margin: 0; font-size: 16px; font-weight: 700; }
+.st-card header .phase { margin-left: auto; cursor: help; }
+.st-rank { font-size: 11px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: var(--text-muted); }
+.st-card.st-top .st-rank { color: var(--accent); }
+.st-when { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.st-when > div, .st-stats > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.st-when b { font-size: 15px; }
+.st-timeline { position: relative; height: 8px; border-radius: 4px; background: var(--surface-3); cursor: help; }
+.st-timeline i { position: absolute; top: 0; bottom: 0; border-radius: 4px; background: var(--series-lo); }
+.st-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 14px; padding-top: 12px; border-top: 1px solid var(--border); }
+.st-stats > div { cursor: help; }
+.st-stats b { font-size: 17px; font-variant-numeric: tabular-nums; }
+.st-card footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: auto; padding-top: 10px; border-top: 1px solid var(--border); }
+.plan-box {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; margin-bottom: 14px; padding: 12px 14px;
+  border-radius: 12px; border: 1px solid color-mix(in srgb, var(--series-lo) 50%, transparent); background: #3987e512;
+}
+.plan-box[hidden] { display: none; }
+.pb-main { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.pb-next { font-size: 13px; color: var(--text-secondary); }
+.pb-bar { flex-basis: 100%; order: 9; height: 6px; border-radius: 3px; background: var(--surface-3); overflow: hidden; }
+.pb-bar i { display: block; height: 100%; background: var(--series-lo); transition: width .4s; }
+.pb-nums { display: flex; gap: 16px; margin-left: auto; font-size: 13px; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+
 /* ----- range density ----- */
 .density { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); }
 .density-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }

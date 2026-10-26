@@ -77,6 +77,39 @@
       <div class="card-body"><div class="tiles" id="tiles"></div></div>
     </article>
 
+    <article class="card" data-card="strategy" data-span="12">
+      <header class="card-head">
+        <span class="grip" data-tip="Drag to move">⠿</span>
+        <h2>Strategy generator</h2>
+        <div class="tools">
+          <label class="field" data-tip="Base stake per bet">Stake <input id="stStake" type="number" min="0.01" step="0.01" value="0.25"></label>
+          <label class="field" data-tip="The most a plan may lose. Plans end early rather than stake beyond it">Budget <input id="stBudget" type="number" min="0.01" step="1" value="20"></label>
+          <label class="field" data-tip="How many upcoming rounds a plan covers">Period <input id="stPeriod" type="number" min="10" max="500" step="10" value="100"> rounds</label>
+          <label class="field" data-tip="What a bet on an instant 1.00× crash pays (e.g. Trenball). Leave empty to leave 1.00× out of the plans">1.00× pays ×
+            <input id="stOnePay" type="number" min="1.01" step="0.01" placeholder="off"></label>
+          <select id="stGoal" aria-label="What to rank plans by">
+            <option value="balanced">Goal: balanced</option>
+            <option value="safe">Goal: lowest risk</option>
+            <option value="history">Goal: best history</option>
+            <option value="payout">Goal: biggest win (risk ≤ 60)</option>
+          </select>
+          <button id="stGen" class="btn primary">Generate</button>
+          <button class="icon-btn size" data-tip="Change panel width">⇔</button>
+        </div>
+      </header>
+      <div class="card-body">
+        <div class="plan-box" id="planBox" hidden></div>
+        <p class="st-meta" id="stMeta"></p>
+        <div class="st-grid" id="stCards"></div>
+        <p class="note">Each plan follows one target: <b>start</b> when its Since reaches a share of the adjusted gap (or now),
+          <b>end</b> at the first hit or after a set number of bets, with flat, step-up (double after ⅔ of the bets), recovery
+          (each stake sized to win back earlier losses) or every-round staking. Every plan stays within your <b>budget</b>; risk = 50 × chance of ending down + 50 × share of the budget at stake. Odds are exact from the default chance;
+          <b>history</b> replays the same rule over every past period of the loaded rounds. Every plan's expected total multiplier
+          is ×0.990 of what it stakes because each bet returns 99% on average — the plans differ in risk and in how the result is
+          spread, not in expected value. For reference only; you place any bets yourself.</p>
+      </div>
+    </article>
+
     <article class="card" data-card="chart" data-span="12">
       <header class="card-head">
         <span class="grip" data-tip="Drag to move">⠿</span>

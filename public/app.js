@@ -17,6 +17,12 @@ const DEFAULTS = {
   rowAlerts: {}, // target -> true: alert when Since reaches the row's % of Adj. gap
   rowPct: {}, // target -> custom alert %; rows without one use alertPct
   alertPct: 95,
+  stratStake: 0.25, // strategy generator settings
+  stratPeriod: 100,
+  stratBudget: 20, // most a plan may lose
+  stratGoal: 'balanced',
+  onePay: null, // payout of a bet on an instant 1.00× crash (unknown until set)
+  plan: null, // strategy being tracked
   devTargets: [1, 100, null, null], // fixed colour slots, so a series keeps its colour
   devMode: 'roll',
   chartMode: 'pan', // 'pan' | 'select'
@@ -802,6 +808,344 @@ function initDev() {
   });
 }
 
+// ---------- strategy generator ----------
+//
+// A strategy = one target to follow, a start rule, an end rule and a staking plan,
+// for the next `period` rounds. Candidates are built from the system's own signals
+// (default chance, Since, adjusted gap, the row alert %), scored exactly from the
+// default chance, and replayed over every past period of the loaded history.
+
+const STAKING = {
+  flat: 'Flat',
+  step: 'Step-up',
+  recovery: 'Recovery',
+  every: 'Every round',
+};
+let strat = null; // { at: round id generated after, list: [...], tried: n }
+
+// Stake for each bet of an n-bet plan with base stake b and payout `pay`.
+function stakesFor(plan, b, n, pay) {
+  const s = [];
+  if (plan === 'step') {
+    const cut = Math.ceil((n * 2) / 3); // like 40 of 60 at the base stake, then double
+    for (let k = 1; k <= n; k++) s.push(k <= cut ? b : 2 * b);
+  } else if (plan === 'recovery') {
+    // Each stake is sized so a hit recovers every earlier loss plus the first bet's win.
+    let spent = 0;
+    for (let k = 1; k <= n; k++) {
+      const st = k === 1 ? b : (spent + b * (pay - 1)) / (pay - 1);
+      s.push(st);
+      spent += st;
+    }
+  } else {
+    for (let k = 0; k < n; k++) s.push(b);
+  }
+  return s;
+}
+
+// A plan never stakes more than the budget in total: it ends early when the next stake would exceed it.
+function fitBudget(stakes, budget) {
+  let sum = 0, n = 0;
+  while (n < stakes.length && sum + stakes[n] <= budget + 1e-9) sum += stakes[n++];
+  return stakes.slice(0, n);
+}
+
+// Exact outcome distribution from the default chance p.
+// Stop-at-first-hit plans end at the first hit; 'every' bets every round of the plan.
+function theory(p, pay, stakes, every, budget) {
+  const n = stakes.length, q = 1 - p, total = stakes.reduce((a, v) => a + v, 0);
+  const out = []; // [probability, profit]
+  let expStaked = 0;
+  if (every) {
+    const s = stakes[0];
+    let pr = q ** n;
+    for (let h = 0; h <= n; h++) {
+      out.push([pr, s * (pay * h - n)]);
+      pr = (pr * (n - h) * p) / ((h + 1) * q);
+    }
+    expStaked = total;
+  } else {
+    let reach = 1, spent = 0;
+    for (let k = 0; k < n; k++) {
+      spent += stakes[k];
+      expStaked += reach * stakes[k];
+      out.push([reach * p, stakes[k] * pay - spent]);
+      reach *= q;
+    }
+    out.push([reach, -total]);
+  }
+  let pWin = 0, pLoss = 0, exp = 0, best = -Infinity;
+  for (const [pr, v] of out) {
+    if (v > 1e-9) pWin += pr;
+    else if (v < -1e-9) pLoss += pr;
+    exp += pr * v;
+    if (pr > 1e-12 && v > best) best = v;
+  }
+  // Risk 0–100: half the chance of ending down, half the share of the budget that can be lost.
+  // The second half keeps "win a little often, lose a lot rarely" plans from looking safe.
+  const atStake = total / budget;
+  const risk = Math.round(clamp(50 * pLoss + 50 * atStake, 0, 100));
+  return { pWin, pLoss, atStake, exp, expStaked, ret: (expStaked + exp) / expStaked, maxLoss: total, best, risk };
+}
+
+// Hits and last-hit index per round (oldest first) for one target, for fast replays.
+function hitSeries(asc, x) {
+  const n = asc.length, hit = new Uint8Array(n), pref = new Int32Array(n + 1), last = new Int32Array(n);
+  let lh = -1;
+  for (let i = 0; i < n; i++) {
+    hit[i] = isHit(asc[i][1], x) ? 1 : 0;
+    pref[i + 1] = pref[i] + hit[i];
+    if (hit[i]) lh = i;
+    last[i] = lh;
+  }
+  return { hit, pref, last };
+}
+
+// Start offset and number of bets for a rule, given Since and the adjusted gap at that moment.
+function planShape(rule, since, adj, avg, period) {
+  const t0 = rule.f ? Math.max(0, Math.ceil(rule.f * adj - since)) : 0;
+  if (t0 >= period) return null;
+  const n = rule.len === 'rest' ? period - t0 : Math.min(period - t0, Math.max(1, Math.round(rule.len * avg)));
+  return { t0, n };
+}
+
+// Replay a rule over every past period: the state at each period's start comes only
+// from the rounds before it, exactly as the live strategy would have seen it.
+function backtest(asc, ser, rule, x, p, pay, period, b, w, budget) {
+  const avg = 1 / p;
+  let periods = 0, wins = 0, staked = 0, returned = 0, worst = 0, sum = 0;
+  for (let i = Math.max(w, 1); i + period <= asc.length; i += period) {
+    const rate = (ser.pref[i] - ser.pref[i - w]) / w;
+    const adj = avg * clamp(rate / p, 0.25, 4);
+    const since = ser.last[i - 1] < 0 ? i : i - 1 - ser.last[i - 1];
+    const shape = planShape(rule, since, adj, avg, period);
+    if (!shape) continue;
+    const st = fitBudget(stakesFor(rule.plan === 'every' ? 'flat' : rule.plan, b, shape.n, pay), budget);
+    if (!st.length) continue;
+    let s = 0, r = 0;
+    for (let k = 0; k < st.length; k++) {
+      s += st[k];
+      if (ser.hit[i + shape.t0 + k]) { r += st[k] * pay; if (rule.plan !== 'every') break; }
+    }
+    periods++; staked += s; returned += r;
+    const pr = r - s;
+    sum += pr;
+    if (pr > 1e-9) wins++;
+    if (pr < worst) worst = pr;
+  }
+  return periods ? { periods, pWin: wins / periods, ret: returned / staked, avgProfit: sum / periods, worst } : null;
+}
+
+const GOALS = {
+  balanced: (c) => (0.5 * c.th.pWin + 0.5 * (c.bt ? c.bt.pWin : c.th.pWin)) * (1 - c.th.risk / 100),
+  safe: (c) => -c.th.risk + 0.01 * c.th.pWin,
+  history: (c) => (c.bt && c.bt.periods >= 20 ? c.bt.ret : -Infinity),
+  payout: (c) => (c.th.risk <= 60 ? c.th.best : -Infinity),
+};
+
+function generateStrategies() {
+  if (!games.length) return;
+  const period = S.stratPeriod, b = S.stratStake, budget = S.stratBudget, w = Math.min(win(), games.length - 1);
+  const asc = [...games].reverse();
+  const cands = [], seen = new Set();
+  for (const x of S.targets) {
+    const pay = x === 1 ? S.onePay : x;
+    if (!pay || pay <= 1) continue; // 1.00× only when its payout is set
+    const p = prob(x), avg = 1 / p, m = model(x), ser = hitSeries(asc, x);
+    const triggers = [...new Set([0, rowPctOf(x) / 100, 0.8, 1.2])];
+    for (const f of triggers) for (const len of [1, 2, 'rest']) for (const plan of Object.keys(STAKING)) {
+      const rule = { f, len, plan };
+      const shape = planShape(rule, m.k, m.adjGap, avg, period);
+      if (!shape) continue;
+      const stakes = fitBudget(stakesFor(plan === 'every' ? 'flat' : plan, b, shape.n, pay), budget);
+      if (!stakes.length) continue; // even one stake exceeds the budget
+      const key = [x, shape.t0, stakes.length, plan].join('|');
+      if (seen.has(key)) continue; // e.g. "2 gaps" capped to the same length as "rest"
+      seen.add(key);
+      const th = theory(p, pay, stakes, plan === 'every', budget);
+      const bt = backtest(asc, ser, rule, x, p, pay, period, b, w, budget);
+      cands.push({ x, pay, p, avg, rule, t0: shape.t0, n: stakes.length, cut: stakes.length < shape.n, stakes, th, bt, adj: m.adjGap, since: m.k });
+    }
+  }
+  const goal = GOALS[S.stratGoal] || GOALS.balanced;
+  cands.forEach((c) => (c.score = goal(c)));
+  cands.sort((a, b2) => b2.score - a.score);
+  // Top 5, preferring one plan per target so the picks are not five versions of one idea.
+  const list = [], used = new Set();
+  for (const c of cands) if (list.length < 5 && Number.isFinite(c.score) && !used.has(c.x)) { list.push(c); used.add(c.x); }
+  for (const c of cands) if (list.length < 5 && Number.isFinite(c.score) && !list.includes(c)) list.push(c);
+  strat = { at: games[0][0], list, tried: cands.length };
+  renderStrategy();
+}
+
+const money = (v) => (v < 0 ? '−' : '') + Math.abs(v).toFixed(2);
+const signed = (v) => (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v).toFixed(2);
+function riskLabel(r) {
+  if (r < 25) return { label: 'Low', color: 'good' };
+  if (r < 50) return { label: 'Medium', color: 'warn' };
+  if (r < 75) return { label: 'High', color: 'series-hi' };
+  return { label: 'Very high', color: 'bad' };
+}
+
+function stakeText(c) {
+  const s = c.stakes, b = s[0];
+  if (c.rule.plan === 'step') {
+    const cut = s.findIndex((v) => v > b);
+    return cut < 0 ? `${money(b)} every bet` : `${money(b)} for ${cut} bets, then ${money(2 * b)}`;
+  }
+  if (c.rule.plan === 'recovery') return `${money(b)}, raised after each miss (max ${money(Math.max(...s))})`;
+  return `${money(b)} every ${c.rule.plan === 'every' ? 'round' : 'bet'}`;
+}
+
+function strategyCard(c, rank) {
+  const startId = strat.at + 1 + c.t0, endId = startId + c.n - 1; // relative to the round it was built from
+  const rk = riskLabel(c.th.risk);
+  const every = c.rule.plan === 'every';
+  const startText = c.t0 === 0 ? 'Next round' : `In ${c.t0} round${c.t0 === 1 ? '' : 's'}`;
+  const why = c.rule.f
+    ? `when Since reaches ${Math.round(c.rule.f * 100)}% of adj. gap (${gap(c.rule.f * c.adj)}; now ${int(c.since)})`
+    : 'no waiting';
+  const endText = every ? `After ${c.n} rounds` : `First hit, or after ${c.n} bets`;
+  const cutNote = c.cut ? ' · shortened to fit the budget' : '';
+  const winText = every ? `${signed(c.th.best)} best case` : `${signed(c.stakes[0] * c.pay - c.stakes[0])} if bet 1 hits`;
+  const bt = c.bt;
+  const slots = S.stratPeriod;
+  return `<article class="st-card ${rank === 0 ? 'st-top' : ''}">
+    <header>
+      <span class="st-rank">${rank === 0 ? 'Top pick' : '#' + (rank + 1)}</span>
+      <h3>Follow ${tlabel(c.x)}</h3>
+      <span class="phase" style="--c: var(--${rk.color})" data-tip="Risk score ${c.th.risk}/100 = 50 × chance of ending down (${pct(c.th.pLoss)}) + 50 × share of your budget that can be lost (${pct(c.th.atStake)})">Risk ${c.th.risk} · ${rk.label}</span>
+    </header>
+    <div class="st-when">
+      <div><span class="label">Start</span><b>${startText}</b><span class="sub">#${startId} · ${why}</span></div>
+      <div><span class="label">End</span><b>${endText}</b><span class="sub">latest #${endId}${every ? '' : ' · stop when it hits'}${cutNote}</span></div>
+    </div>
+    <div class="st-timeline" data-tip="Next ${slots} rounds: waiting ${c.t0}, then up to ${c.n} ${every ? 'rounds' : 'bets'}">
+      <i style="left:${(c.t0 / slots) * 100}%; width:${(c.n / slots) * 100}%"></i>
+    </div>
+    <div class="st-stats">
+      <div data-tip="Expected return on everything you stake. From the game's default chance this is ×0.99 for every plan (1% house edge)${bt ? `; over ${bt.periods} past periods this rule returned ×${bt.ret.toFixed(3)}` : ''}">
+        <span class="label">Expected total multiplier</span><b>×${c.th.ret.toFixed(3)}</b>
+        <span class="sub">${bt ? `history ×${bt.ret.toFixed(3)}` : 'no past period triggered'}</span></div>
+      <div data-tip="Chance the plan ends with a profit${bt ? `; it ended in profit in ${pct(bt.pWin)} of ${bt.periods} past periods` : ''}">
+        <span class="label">Chance of profit</span><b>${pct(c.th.pWin)}</b>
+        <span class="sub">${bt ? `history ${pct(bt.pWin)}` : '—'}</span></div>
+      <div data-tip="Expected profit = −1% of the expected amount staked (${money(c.th.expStaked)})">
+        <span class="label">Expected profit</span><b>${signed(c.th.exp)}</b><span class="sub">${winText}</span></div>
+      <div data-tip="What you lose if no bet hits: ${pct(c.th.atStake)} of your budget${bt ? `; the worst past period lost ${money(-bt.worst)}` : ''}">
+        <span class="label">Max loss</span><b class="neg">${money(-c.th.maxLoss)}</b><span class="sub">${pct(c.th.atStake)} of budget</span></div>
+    </div>
+    <footer>
+      <span class="sub">${STAKING[c.rule.plan]}: ${stakeText(c)} · pays ×${c.pay}</span>
+      <button class="btn small st-track" data-i="${rank}">Track this plan</button>
+    </footer>
+  </article>`;
+}
+
+// ---- tracking a chosen plan through the coming rounds (you place the bets) ----
+
+function planState(pl) {
+  const top = games[0]?.[0] ?? 0, endId = pl.startId + pl.stakes.length - 1;
+  let k = 0, staked = 0, returned = 0, hits = 0, won = false;
+  for (let id = pl.startId; id <= Math.min(top, endId); id++) {
+    const g = byId.get(id);
+    if (!g) break;
+    staked += pl.stakes[k];
+    if (isHit(g[1], pl.x)) { returned += pl.stakes[k] * pl.pay; hits++; }
+    k++;
+    if (hits && !pl.every) { won = true; break; }
+  }
+  const status = won ? 'won' : top < pl.startId ? 'waiting' : k >= pl.stakes.length ? 'ended' : 'active';
+  return { k, staked, returned, profit: returned - staked, hits, status, next: pl.stakes[k], endId, toStart: pl.startId - top - 1 };
+}
+
+function checkPlan(before) {
+  if (!S.plan || !before) return;
+  const pl = S.plan, now = planState(pl);
+  const what = `${tlabel(pl.x)} at ×${pl.pay}`;
+  if (now.status === 'waiting' && now.toStart === 0 && before.toStart !== 0) notify('Plan starts next round', `Bet 1: ${money(pl.stakes[0])} on ${what}`, 'plan');
+  if (before.status === 'waiting' && now.status === 'active' && now.k > 0) notify('Plan started', `Next: bet ${now.k + 1}, ${money(now.next)} on ${what}`, 'plan');
+  if (now.hits > before.hits) notify(`${tlabel(pl.x)} hit`, `Plan P&L ${signed(now.profit)} after ${now.k} bet${now.k === 1 ? '' : 's'}`, 'plan');
+  if ((now.status === 'won' || now.status === 'ended') && before.status !== now.status) {
+    notify(now.profit > 0 ? 'Plan finished in profit' : 'Plan finished', `${now.k} bets · staked ${money(now.staked)} · P&L ${signed(now.profit)}`, 'plan');
+  }
+}
+
+function renderPlanBox() {
+  const box = $('planBox');
+  if (!S.plan || !games.length) { box.hidden = true; return; }
+  const pl = S.plan, st = planState(pl), n = pl.stakes.length;
+  const label = { waiting: 'Waiting', active: 'Active', won: 'Hit — finished', ended: 'Finished' }[st.status];
+  const color = { waiting: 'text-muted', active: 'series-lo', won: 'good', ended: st.profit > 0 ? 'good' : 'bad' }[st.status];
+  const nextLine = st.status === 'waiting'
+    ? (st.toStart === 0 ? `<b>Bet 1 next round:</b> ${money(pl.stakes[0])}` : `Starts in ${st.toStart} round${st.toStart === 1 ? '' : 's'} (#${pl.startId})`)
+    : st.status === 'active' ? `<b>Next round: bet ${st.k + 1} of ${n}</b> · stake ${money(st.next)}` : `Done after ${st.k} bet${st.k === 1 ? '' : 's'}`;
+  box.hidden = false;
+  box.innerHTML = `
+    <div class="pb-main">
+      <span class="label">Tracking</span>
+      <b>Follow ${tlabel(pl.x)} · ${STAKING[pl.plan]}</b>
+      <span class="phase" style="--c: var(--${color})">${label}</span>
+    </div>
+    <div class="pb-next">${nextLine}</div>
+    <div class="pb-bar" data-tip="${st.k} of ${n} bets played"><i style="width:${(st.k / n) * 100}%"></i></div>
+    <div class="pb-nums">
+      <span>Staked <b>${money(st.staked)}</b></span>
+      <span>Returned <b>${money(st.returned)}</b></span>
+      <span>P&amp;L <b class="${st.profit > 0 ? 'pos' : st.profit < 0 ? 'neg' : ''}">${signed(st.profit)}</b></span>
+    </div>
+    <button class="btn small ghost" id="planStop">${st.status === 'won' || st.status === 'ended' ? 'Clear' : 'Stop tracking'}</button>`;
+}
+
+function renderStrategy() {
+  renderPlanBox();
+  for (const [id, v] of [['stStake', S.stratStake], ['stBudget', S.stratBudget], ['stPeriod', S.stratPeriod], ['stOnePay', S.onePay ?? '']]) {
+    if (document.activeElement !== $(id)) $(id).value = v;
+  }
+  $('stGoal').value = S.stratGoal;
+  if (!strat) { $('stMeta').textContent = 'Click Generate to build plans for the next rounds.'; $('stCards').innerHTML = ''; return; }
+  const ago = games[0][0] - strat.at;
+  $('stMeta').innerHTML = `Built from the state after round #${strat.at}${ago ? ` · <b class="warn-t">${ago} new round${ago === 1 ? '' : 's'} since — regenerate for fresh timing</b>` : ''}
+    · ${strat.tried} plans compared, each replayed over the loaded history`;
+  const html = strat.list.length ? strat.list.map(strategyCard).join('') : '<p class="sub">No plan starts within this period. Try a longer period.</p>';
+  if ($('stCards').dataset.html !== html) { $('stCards').innerHTML = html; $('stCards').dataset.html = html; }
+}
+
+function initStrategy() {
+  const num = (id, key, min, max, def) => $(id).addEventListener('change', (e) => {
+    const v = +e.target.value;
+    S[key] = Number.isFinite(v) && v >= min ? Math.min(v, max) : def;
+    save(); generateStrategies();
+  });
+  num('stStake', 'stratStake', 0.01, 1e6, 0.25);
+  num('stPeriod', 'stratPeriod', 10, 500, 100);
+  num('stBudget', 'stratBudget', 0.01, 1e9, 20);
+  $('stOnePay').addEventListener('change', (e) => {
+    const v = +e.target.value;
+    S.onePay = e.target.value === '' || !(v > 1) ? null : v;
+    save(); generateStrategies();
+  });
+  $('stGoal').addEventListener('change', (e) => { S.stratGoal = e.target.value; save(); generateStrategies(); });
+  $('stGen').onclick = generateStrategies;
+  $('stCards').addEventListener('click', async (e) => {
+    const b = e.target.closest('.st-track');
+    if (!b || !strat) return;
+    if (games[0][0] !== strat.at) {
+      // New rounds arrived since these plans were built: rebuild so the timing is current.
+      generateStrategies();
+      return toast("Plans refreshed", "New rounds arrived, so the plans were rebuilt for the latest round. Check the pick and click Track again.");
+    }
+    const c = strat.list[+b.dataset.i];
+    S.plan = { x: c.x, pay: c.pay, plan: c.rule.plan, every: c.rule.plan === 'every', startId: strat.at + 1 + c.t0, stakes: c.stakes };
+    save();
+    await askNotifyPermission();
+    render();
+  });
+  $('planBox').addEventListener('click', (e) => {
+    if (e.target.closest('#planStop')) { S.plan = null; save(); render(); }
+  });
+}
+
 // ---------- render loop ----------
 
 let queued = false;
@@ -822,6 +1166,7 @@ function render(flash = false) {
     renderDensity();
     renderDev();
     renderProbs();
+    renderStrategy();
     renderAnalysis();
   });
 }
@@ -1150,13 +1495,16 @@ function connect() {
     byId.clear();
     for (const g of games) byId.set(g[0], g);
     checkAlerts(null);
+    if (!strat) generateStrategies();
     render();
   });
   es.addEventListener('games', (e) => {
     const fresh = JSON.parse(e.data); // oldest first
+    const planBefore = S.plan && games.length ? planState(S.plan) : null;
     for (const g of fresh) { games.unshift(g); byId.set(g[0], g); }
     if (view.offset > 0) view.offset += fresh.length; // keep a panned chart still
     checkAlerts(fresh);
+    checkPlan(planBefore);
     render(true);
   });
   es.addEventListener('status', (e) => {
@@ -1169,5 +1517,6 @@ function connect() {
 initBoard();
 initChart();
 initDev();
+initStrategy();
 initControls();
 connect();
