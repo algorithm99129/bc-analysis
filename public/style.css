@@ -300,7 +300,15 @@ select:disabled { opacity: .45; }
 /* ----- strategy generator ----- */
 #stStake, #stBudget { width: 72px; }
 #stPeriod, #stOnePay { width: 70px; }
-.st-meta { margin: 0 0 12px; font-size: 12px; color: var(--text-muted); }
+.st-meta { margin: 0 0 12px; font-size: 12px; color: var(--text-muted); display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.st-live { display: inline-flex; align-items: center; gap: 6px; padding: 2px 9px; border-radius: 999px; font-weight: 600; color: var(--good); background: color-mix(in srgb, var(--good) 14%, transparent); }
+.st-live i { width: 7px; height: 7px; border-radius: 50%; background: var(--good); animation: pulse 2s infinite; }
+.st-live.busy { color: var(--warn); background: color-mix(in srgb, var(--warn) 14%, transparent); }
+.st-live.busy i { background: var(--warn); }
+.st-card.st-tracked { border-color: color-mix(in srgb, var(--series-lo) 70%, transparent); }
+.st-tracking { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--series-lo); white-space: nowrap; }
+.st-tracking .ic { width: 14px; height: 14px; }
+.pb-sl input { width: 72px; height: 28px; }
 .warn-t { color: var(--warn); font-weight: 600; }
 .st-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 14px; }
 .st-card {

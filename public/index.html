@@ -113,7 +113,7 @@
             <option value="history">Goal: best history</option>
             <option value="payout">Goal: biggest win (risk ≤ 60)</option>
           </select>
-          <button id="stGen" class="btn primary"><svg class="ic" aria-hidden="true"><use href="#i-sparkles"/></svg>Generate</button>
+          <button id="stGen" class="btn primary" data-tip="Plans rebuild by themselves after every round; this rebuilds right now"><svg class="ic" aria-hidden="true"><use href="#i-sparkles"/></svg>Rebuild</button>
           <button class="icon-btn size" data-tip="Change panel width"><svg class="ic" aria-hidden="true"><use href="#i-width"/></svg></button>
         </div>
       </header>
@@ -121,12 +121,15 @@
         <div class="plan-box" id="planBox" hidden></div>
         <p class="st-meta" id="stMeta"></p>
         <div class="st-grid" id="stCards"></div>
-        <p class="note">Each plan follows one target: <b>start</b> when its Since reaches a share of the adjusted gap (or now),
-          <b>end</b> at the first hit or after a set number of bets, with flat, step-up (double after ⅔ of the bets), recovery
-          (each stake sized to win back earlier losses) or every-round staking. Every plan stays within your <b>budget</b>; risk = 50 × chance of ending down + 50 × share of the budget at stake. Odds are exact from the default chance;
-          <b>history</b> replays the same rule over every past period of the loaded rounds. Every plan's expected total multiplier
-          is ×0.990 of what it stakes because each bet returns 99% on average — the plans differ in risk and in how the result is
-          spread, not in expected value. For reference only; you place any bets yourself.</p>
+        <p class="note">Each plan is a <b>looping rule</b> for one target: wait until its Since reaches a share of the adjusted gap
+          (or start right away), bet until the first hit or a set number of bets (every-round plans bet each round of the cycle),
+          then wait for the trigger again — until you stop it. Staking is flat, step-up (double after ⅔ of the bets), recovery
+          (each stake sized to win back the cycle's losses) or every-round, and no cycle stakes more than your <b>budget</b>.
+          Plans are rebuilt after every round from the history up to that round: each is simulated over the next period from the
+          default chance, and <b>history</b> replays the same rule over every past period. Risk = 50 × chance of ending down +
+          50 × the 1-in-20 bad-case loss as a share of the budget. Every bet returns 99% of its stake on average, so every plan's
+          expected total multiplier is ×0.990 — plans differ in risk and spread, not in expected value. For reference only; you
+          place any bets yourself.</p>
       </div>
     </article>
 
