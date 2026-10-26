@@ -26,6 +26,7 @@ No dependencies — Node 20.12+ only.
 |---|---|---|
 | `HTTP_PROXY` / `HTTPS_PROXY` | — | Proxy used to reach BC.Game (`http://user:pass@host:port`) |
 | `PORT` | `3000` | Web server port |
+| `HOST` | `0.0.0.0` | Interface to listen on (`0.0.0.0` = all, so other devices on the network can connect; `127.0.0.1` = this computer only) |
 | `POLL_MS` | `2000` | Poll interval |
 | `DEPTH` | `50000` | Rounds kept (and available for "Last N") |
 | `BC_HOSTS` | `bc.game,bc.co,bc.fun,bcgame.top,bc.app` | Mirror domains, tried in order |

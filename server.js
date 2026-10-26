@@ -14,6 +14,7 @@ const path = require('path');
 const crypto = require('crypto');
 
 const PORT = +process.env.PORT || 3000;
+const HOST = process.env.HOST || '0.0.0.0'; // all network interfaces, so other devices on the network can open it
 const POLL_MS = +process.env.POLL_MS || 2000;
 const DEPTH = +process.env.DEPTH || 50000; // rounds kept in memory
 const HOSTS = (process.env.BC_HOSTS || 'bc.game,bc.co,bc.fun,bcgame.top,bc.app').split(',');
@@ -306,8 +307,14 @@ setInterval(() => { for (const res of clients) res.write(': ping\n\n'); }, 15000
 
 for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => { saveTimes(); process.exit(0); });
 
-server.listen(PORT, () => {
-  console.log(`BC Crash Analysis running at http://localhost:${PORT}`);
+server.listen(PORT, HOST, () => {
+  console.log(`BC Crash Analysis listening on ${HOST}:${PORT}`);
+  console.log(`  this computer: http://localhost:${PORT}`);
+  if (HOST === '0.0.0.0') {
+    for (const list of Object.values(require('os').networkInterfaces())) {
+      for (const a of list || []) if (a.family === 'IPv4' && !a.internal) console.log(`  network:       http://${a.address}:${PORT}`);
+    }
+  }
   if (PROXY) console.log(`using proxy ${new URL(PROXY).host}`);
   poll();
 });
