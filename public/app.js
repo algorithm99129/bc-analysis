@@ -1383,15 +1383,47 @@ function initControls() {
 
 // ---------- live data ----------
 
+// ---------- connection + loading screen ----------
+
+// Steps shown while the first history loads: pending | active | done | error.
+const loader = { t0: Date.now(), timer: null, server: 'active', bc: 'pending', chain: 'pending', detail: '', hint: '' };
+
+function setStatusPill(kind, text, tip = '') {
+  const el = $('status');
+  el.className = 'status ' + kind; // ok | warn | err
+  el.lastElementChild.textContent = text;
+  if (tip) el.dataset.tip = tip; else delete el.dataset.tip;
+}
+
+function renderLoader() {
+  if (games.length) return;
+  for (const k of ['server', 'bc', 'chain']) $('ls-' + k).dataset.state = loader[k];
+  $('ls-bc-detail').textContent = loader.detail;
+  const secs = Math.round((Date.now() - loader.t0) / 1000);
+  $('loadHint').innerHTML = loader.hint || (secs >= 4 ? `${secs}s — the first load usually takes a few seconds.` : '');
+  $('loading').classList.toggle('failed', loader.server === 'error' || loader.bc === 'error');
+}
+
+function loaded() {
+  loader.server = loader.bc = loader.chain = 'done';
+  clearInterval(loader.timer);
+  document.body.classList.remove('is-loading');
+  $('loading').hidden = true;
+}
+
 function connect() {
+  loader.timer = setInterval(renderLoader, 1000);
+  renderLoader();
   const es = new EventSource('/events');
-  const status = (ok, text) => {
-    $('status').className = 'status ' + (ok ? 'ok' : 'err');
-    $('status').lastElementChild.textContent = text;
+  es.onopen = () => {
+    loader.server = 'done';
+    if (loader.bc === 'pending') loader.bc = 'active';
+    loader.hint = '';
+    renderLoader();
   };
   es.addEventListener('snapshot', (e) => {
     games = JSON.parse(e.data).games;
-    if (games.length) { document.body.classList.remove('is-loading'); $('loading').hidden = true; }
+    if (games.length) loaded(); else renderLoader();
     byId.clear();
     for (const g of games) byId.set(g[0], g);
     checkAlerts(null);
@@ -1410,9 +1442,34 @@ function connect() {
   });
   es.addEventListener('status', (e) => {
     const s = JSON.parse(e.data);
-    status(s.ok, s.ok ? `Live · ${s.host}` : `Error: ${s.error}`);
+    const state = s.state || (s.ok ? 'ok' : 'error');
+    if (state === 'ok') setStatusPill('ok', `Live · ${s.host}`);
+    else if (state === 'connecting') setStatusPill('warn', 'Connecting to BC.Game…', `Trying ${s.host}`);
+    // Once data is loaded a failed poll is usually a blip: amber first, red only if it keeps failing.
+    else if (games.length && s.failures < 5) setStatusPill('warn', 'Reconnecting to BC.Game…', s.error);
+    else setStatusPill('err', 'BC.Game unreachable', s.error);
+
+    if (games.length) return;
+    if (state === 'ok') { loader.bc = 'done'; loader.chain = 'active'; loader.detail = `via ${s.host}`; loader.hint = ''; }
+    else if (state === 'connecting') { loader.bc = 'active'; loader.detail = `trying ${s.host}`; }
+    else {
+      loader.bc = 'error';
+      loader.detail = s.error;
+      loader.hint = `Retrying automatically (attempt ${s.failures}). ` + (s.proxy
+        ? 'The proxy from <code>.env</code> is in use — check that it still works.'
+        : 'If BC.Game is blocked on this network, set <code>HTTP_PROXY</code> in <code>.env</code> and restart the server.');
+    }
+    renderLoader();
   });
-  es.onerror = () => status(false, 'Disconnected — retrying…');
+  es.onerror = () => {
+    setStatusPill('err', 'Server offline — retrying…', 'The dashboard server is not responding. This page reconnects by itself.');
+    if (games.length) return;
+    loader.server = 'error';
+    loader.bc = loader.chain = 'pending';
+    loader.detail = '';
+    loader.hint = 'Can’t reach the dashboard server. Make sure <code>npm start</code> is running — this page reconnects by itself.';
+    renderLoader();
+  };
 }
 
 initBoard();

@@ -118,7 +118,8 @@ function fillTimes() {
 let games = []; // newest first: { id, rate, hash, t, est }  (t = endTime ms; est = true if estimated)
 let salt = null;
 let activeHost = HOSTS[0];
-let status = { ok: false, error: 'starting', host: activeHost, lastPoll: 0 };
+// state: 'connecting' (no data yet) | 'ok' | 'error' (last poll failed; retrying)
+let status = { ok: false, state: 'connecting', error: null, host: activeHost, lastPoll: 0, failures: 0, proxy: false, retryMs: 0 };
 const clients = new Set();
 
 // ---------- fetching ----------
@@ -172,6 +173,7 @@ async function fetchLatest() {
   const order = [activeHost, ...HOSTS.filter((h) => h !== activeHost)];
   let lastErr;
   for (const host of order) {
+    if (!games.length) { status = { ...status, host }; broadcast('status', status); } // show progress while loading
     try {
       const { status: code, json } = await postJson(`https://${host}/api/game/bet/multi/history`,
         { gameUrl: 'crash', page: 1, pageSize: 100 },
@@ -246,9 +248,10 @@ async function poll() {
   try {
     const latest = await fetchLatest();
     update(latest);
-    status = { ok: true, error: null, host: activeHost, lastPoll: Date.now() };
+    status = { ok: true, state: 'ok', error: null, host: activeHost, lastPoll: Date.now(), failures: 0, proxy: !!PROXY, retryMs: 0 };
   } catch (e) {
-    status = { ok: false, error: e.message, host: activeHost, lastPoll: Date.now() };
+    status = { ok: false, state: 'error', error: e.message, host: activeHost, lastPoll: Date.now(),
+      failures: status.failures + 1, proxy: !!PROXY, retryMs: POLL_MS };
     console.error('poll failed:', e.message);
   }
   broadcast('status', status);

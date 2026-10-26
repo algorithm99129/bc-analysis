@@ -35,7 +35,7 @@
     <div class="brand">
       <svg class="logo" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8"/><path d="M6 24 L13 15 L18 19 L26 8"/></svg>
       <h1>Crash Live Analysis</h1>
-      <span id="status" class="status"><i></i><span>Connecting…</span></span>
+      <span id="status" class="status warn"><i></i><span>Connecting…</span></span>
     </div>
     <div class="top-controls">
       <label class="field" data-tip="How many of the most recent rounds every panel analyses">
@@ -55,7 +55,20 @@
 
   <section class="strip" id="strip" aria-label="Most recent results"></section>
 
-  <div id="loading" class="loading" role="status"><span class="spinner"></span><span>Loading round history from BC.Game…</span></div>
+  <div id="loading" class="loading" role="status" aria-live="polite">
+    <div class="load-card">
+      <svg class="logo load-logo" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8"/><path d="M6 24 L13 15 L18 19 L26 8"/></svg>
+      <h2>Getting the live history ready</h2>
+      <p class="load-sub">Fetching the latest rounds and rebuilding the rest from BC.Game's provably-fair hash chain.</p>
+      <ol class="load-steps">
+        <li id="ls-server" data-state="active"><i></i><span>Connect to the dashboard server</span></li>
+        <li id="ls-bc" data-state="pending"><i></i><span>Fetch the latest rounds from BC.Game <small id="ls-bc-detail"></small></span></li>
+        <li id="ls-chain" data-state="pending"><i></i><span>Rebuild 50,000 rounds from the hash chain</span></li>
+      </ol>
+      <div class="load-bar"><i></i></div>
+      <p class="load-hint" id="loadHint"></p>
+    </div>
+  </div>
 
   <main id="board" class="board">
 
