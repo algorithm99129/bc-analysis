@@ -4,6 +4,11 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Crash Live Analysis</title>
+  <meta name="description" content="Live BC.Game Crash history and statistics: hit rates, gaps, deviation, range density and reference strategies. Analysis only — not a bot, no account needed.">
+  <meta name="theme-color" content="#121316">
+  <meta property="og:title" content="Crash Live Analysis">
+  <meta property="og:description" content="Live BC.Game Crash history and statistics for a better understanding of the game. Analysis only — not a bot, no account needed.">
+  <meta property="og:type" content="website">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23d95926'/%3E%3Cpath d='M6 24 L13 15 L18 19 L26 8' stroke='white' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -29,6 +34,17 @@
     <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
     <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14"/><path d="M5 12h14"/></symbol>
     <symbol id="i-stop" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/></symbol>
+    <symbol id="i-heart" viewBox="0 0 24 24"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7z"/></symbol>
+    <symbol id="i-send" viewBox="0 0 24 24"><path d="M22 2 11 13"/><path d="m22 2-7 20-4-9-9-4z"/></symbol>
+    <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+    <symbol id="i-users" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
+    <symbol id="i-chart" viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></symbol>
+    <symbol id="i-bot-off" viewBox="0 0 24 24"><rect x="4" y="8" width="16" height="12" rx="2"/><path d="M12 8V4"/><path d="M9 13v2"/><path d="M15 13v2"/><path d="M2 2l20 20"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></symbol>
+    <symbol id="i-alert" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></symbol>
+    <symbol id="i-book" viewBox="0 0 24 24"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></symbol>
     <symbol id="i-grip" viewBox="0 0 24 24"><g class="dots"><circle cx="9" cy="5" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="9" cy="19" r="1.6"/><circle cx="15" cy="5" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="15" cy="19" r="1.6"/></g></symbol>
   </svg>
   <header class="top">
@@ -36,6 +52,7 @@
       <svg class="logo" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8"/><path d="M6 24 L13 15 L18 19 L26 8"/></svg>
       <h1>Crash Live Analysis</h1>
       <span id="status" class="status warn"><i></i><span>Connecting…</span></span>
+      <span id="online" class="online" data-tip="People with the dashboard open right now"><svg class="ic" aria-hidden="true"><use href="#i-users"/></svg><b class="odo" id="onlineNum" aria-live="polite">—</b><span>online</span></span>
     </div>
     <div class="top-controls">
       <label class="field" data-tip="How many of the most recent rounds every panel analyses">
@@ -44,7 +61,11 @@
       </label>
       <button id="notifyBtn" class="btn notify-btn" data-state="default">Enable desktop alerts</button>
       <button id="soundBtn" class="icon-btn" aria-pressed="true" data-tip="Alert sound on/off"><svg class="ic" aria-hidden="true"><use href="#i-volume"/></svg></button>
-      <button id="resetLayout" class="btn ghost" data-tip="Restore the default panel order and widths"><svg class="ic" aria-hidden="true"><use href="#i-reset"/></svg>Reset layout</button>
+      <button id="resetLayout" class="icon-btn" aria-label="Reset layout" data-tip="Reset layout: restore the default panel order and widths"><svg class="ic" aria-hidden="true"><use href="#i-reset"/></svg></button>
+      <a id="docsBtn" class="icon-btn" href="/docs" aria-label="Guide" data-tip="Guide: how this service works"><svg class="ic" aria-hidden="true"><use href="#i-book"/></svg></a>
+      <button id="aboutBtn" class="icon-btn" aria-label="About" data-tip="About this service"><svg class="ic" aria-hidden="true"><use href="#i-info"/></svg></button>
+      <a id="contactBtn" class="icon-btn" href="https://t.me/idevstar" target="_blank" rel="noopener" aria-label="Contact on Telegram" data-tip="Contact on Telegram: @idevstar"><svg class="ic" aria-hidden="true"><use href="#i-send"/></svg></a>
+      <button id="donateBtn" class="btn donate" data-tip="Support the project with a USDT donation"><svg class="ic" aria-hidden="true"><use href="#i-heart"/></svg>Donate</button>
       <div class="latest">
         <span class="muted">Latest</span>
         <span id="latestId" class="mono">—</span>
@@ -304,9 +325,79 @@
   </main>
 
   <footer class="foot">
-    <span>Data: BC.Game public crash history · older rounds rebuilt and verified from the provably-fair hash chain</span>
-    <span>Each round is independent — the per-round chance is always 99% ÷ target</span>
+    <div class="foot-links">
+      <button class="link" data-open="about"><svg class="ic" aria-hidden="true"><use href="#i-info"/></svg>About</button>
+      <a class="link" href="/docs"><svg class="ic" aria-hidden="true"><use href="#i-book"/></svg>Guide</a>
+      <a class="link" href="https://t.me/idevstar" target="_blank" rel="noopener"><svg class="ic" aria-hidden="true"><use href="#i-send"/></svg>Telegram @idevstar</a>
+      <button class="link donate-link" data-open="donate"><svg class="ic" aria-hidden="true"><use href="#i-heart"/></svg>Donate</button>
+    </div>
+    <span>Analysis only · not a bot · no account or wallet connection · not affiliated with BC.Game · 18+</span>
+    <span>Data: BC.Game public crash history, older rounds rebuilt and verified from the provably-fair hash chain. Each round is independent.</span>
   </footer>
+
+  <dialog id="welcome" class="modal" aria-labelledby="wTitle">
+    <div class="modal-body">
+      <svg class="logo modal-logo" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8"/><path d="M6 24 L13 15 L18 19 L26 8"/></svg>
+      <h2 id="wTitle">Welcome to Crash Live Analysis</h2>
+      <p class="modal-sub">A quick note before you start.</p>
+      <ul class="notice">
+        <li><i class="n-good"><svg class="ic" aria-hidden="true"><use href="#i-chart"/></svg></i><div><b>Analysis only</b>
+          <span>Live and historical BC.Game Crash results, statistics and reference strategies — to help you better understand how the game behaves.</span></div></li>
+        <li><i class="n-good"><svg class="ic" aria-hidden="true"><use href="#i-bot-off"/></svg></i><div><b>This is not a bot</b>
+          <span>It never places bets, plays or automates anything for you. Any decision and any bet is yours.</span></div></li>
+        <li><i class="n-good"><svg class="ic" aria-hidden="true"><use href="#i-lock"/></svg></i><div><b>No account, no connection</b>
+          <span>No sign-up, no login, and no wallet or BC.Game account connection. We will never ask for your password, keys or funds.</span></div></li>
+        <li><i class="n-warn"><svg class="ic" aria-hidden="true"><use href="#i-alert"/></svg></i><div><b>Not affiliated with BC.Game · 18+</b>
+          <span>Every round is independent and unpredictable; nothing here can guarantee a result. Play responsibly.</span></div></li>
+      </ul>
+      <div class="modal-actions">
+        <a class="btn ghost" href="/docs" target="_blank" rel="noopener"><svg class="ic" aria-hidden="true"><use href="#i-book"/></svg>Read the guide</a>
+        <a class="btn ghost" href="https://t.me/idevstar" target="_blank" rel="noopener"><svg class="ic" aria-hidden="true"><use href="#i-send"/></svg>Contact @idevstar</a>
+        <button class="btn primary" id="welcomeOk"><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg>I understand</button>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog id="donate" class="modal" aria-labelledby="dTitle">
+    <div class="modal-body">
+      <button class="icon-btn modal-x" data-close aria-label="Close"><svg class="ic" aria-hidden="true"><use href="#i-x"/></svg></button>
+      <div class="donate-head">
+        <i class="donate-badge"><svg class="ic" aria-hidden="true"><use href="#i-heart"/></svg></i>
+        <div><h2 id="dTitle">Support Crash Live Analysis</h2>
+          <p class="modal-sub">Donations keep the servers running and the analysis free for everyone. Thank you!</p></div>
+      </div>
+      <div class="step-label">1 · Amount (USDT)</div>
+      <div class="amounts" role="group" aria-label="Amount">
+        <button class="amt" data-amt="10">10</button>
+        <button class="amt" data-amt="100">100</button>
+        <button class="amt" data-amt="1000">1,000</button>
+        <button class="amt" data-amt="custom">Custom</button>
+      </div>
+      <label class="custom-amt" id="customWrap" hidden>
+        <input id="customAmt" type="number" min="1" step="1" inputmode="decimal" placeholder="Enter amount"><span>USDT</span>
+      </label>
+      <div class="step-label">2 · Network</div>
+      <div class="seg networks" role="group" aria-label="Network">
+        <button data-net="bep20">BEP20 · BNB Smart Chain</button>
+        <button data-net="trc20">TRC20 · TRON</button>
+      </div>
+      <div class="pay">
+        <div class="qr-box"><div class="qr" id="donateQr"></div><span>Scan for the address</span></div>
+        <div class="pay-info">
+          <span class="label">Send</span>
+          <div class="pay-amt" id="payAmt">—</div>
+          <span class="label" id="payTo">to this address</span>
+          <code class="addr" id="payAddr"></code>
+          <div class="pay-btns">
+            <button class="btn small" id="copyAddr"><svg class="ic" aria-hidden="true"><use href="#i-copy"/></svg>Copy address</button>
+            <button class="btn small ghost" id="copyAmt"><svg class="ic" aria-hidden="true"><use href="#i-copy"/></svg>Copy amount</button>
+          </div>
+        </div>
+      </div>
+      <p class="warn-box"><svg class="ic" aria-hidden="true"><use href="#i-alert"/></svg><span id="netWarn"></span></p>
+      <p class="modal-foot">Questions? Telegram <a href="https://t.me/idevstar" target="_blank" rel="noopener">@idevstar</a></p>
+    </div>
+  </dialog>
 
   <div id="tip" class="tip" hidden></div>
   <div id="toasts" class="toasts" aria-live="polite"></div>

@@ -62,9 +62,8 @@ const pct = (v) => { const p = v * 100; return p === 0 ? '0%' : (p >= 1 ? p.toFi
 const gap = (n) => (n < 10 ? n.toFixed(1) : int(n));
 const int = (n) => Math.round(n).toLocaleString();
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
-// g = [id, rate, endTime, estimated]; estimated times (rounds older than the API's
-// latest 100 that the server never saw live) are prefixed with ≈.
-const clock = (g) => (g[2] ? (g[3] ? '≈ ' : '') + new Date(g[2]).toLocaleTimeString() : 'time n/a');
+// g = [id, rate, endTime]; endTime is null for older rounds the server never saw live.
+const clock = (g) => (g[2] ? new Date(g[2]).toLocaleTimeString() : '');
 const win = () => Math.min(S.win, games.length);
 const sample = () => games.slice(0, win());
 
@@ -222,7 +221,7 @@ function renderFocus(card) {
         <div class="label">Rounds since last ${tname(cfg.x)}</div>
         <div class="hero">${m.all.found ? int(m.k) : '&gt;' + int(m.k)}
           <span class="phase" style="--c: var(--${ph.color})">${ph.label}</span></div>
-        <div class="sub">${last ? `Last ${fmt(last[1])} · #${last[0]} · ${clock(last)}` : 'Not seen in loaded history'}</div>
+        <div class="sub">${last ? `Last ${fmt(last[1])} · #${last[0]}${last[2] ? ' · ' + clock(last) : ''}` : 'Not seen in loaded history'}</div>
         <div class="facts" data-tip="${modelTip}">
           <span>${pct(m.p)} per round</span><span>adj. gap ${gap(m.adjGap)}</span><span class="${m.nextIn > 0 ? '' : 'over'}">${next}</span>
         </div>
@@ -584,11 +583,10 @@ function renderDensity() {
   if (!has) { $('densitySummary').textContent = 'The selected rounds are outside the loaded history.'; return; }
 
   const n = rows.length, newest = rows[0], oldest = rows.at(-1);
-  const mins = newest[2] && oldest[2] ? (newest[2] - oldest[2]) / 60000 : null;
+  const mins = newest[2] && oldest[2] ? (newest[2] - oldest[2]) / 60000 : null; // only when both ends were seen live
   const span = mins == null ? '' : mins < 90 ? `${Math.round(mins)} min` : `${(mins / 60).toFixed(1)} h`;
-  const est = newest[3] || oldest[3] ? '≈ ' : '';
   $('densitySummary').innerHTML = `<b>${int(n)}</b> rounds · #${oldest[0]} – #${newest[0]}` +
-    (span ? ` · ${est}${new Date(oldest[2]).toLocaleString()} → ${new Date(newest[2]).toLocaleTimeString()} (${est}${span})` : '');
+    (span ? ` · ${new Date(oldest[2]).toLocaleString()} → ${new Date(newest[2]).toLocaleTimeString()} (${span})` : '');
 
   const focusXs = [S.focus.focusA.x, S.focus.focusB.x];
   $('densityRows').innerHTML = [...S.targets].sort((a, b) => a - b).map((x) => {
@@ -1082,8 +1080,7 @@ function showTip(html, e) {
   tip.style.top = (e.clientY - r.height - 14 < 8 ? e.clientY + 18 : e.clientY - r.height - 14) + 'px';
 }
 function hideTip() { tip.hidden = true; }
-const gameTip = (g) => `<b>#${g[0]}</b> &nbsp;${fmt(g[1])}<br><span class="muted">${
-  !g[2] ? 'time n/a' : g[3] ? `≈ ${new Date(g[2]).toLocaleString()} (estimated)` : new Date(g[2]).toLocaleString()}</span>`;
+const gameTip = (g) => `<b>#${g[0]}</b> &nbsp;${fmt(g[1])}${g[2] ? `<br><span class="muted">${new Date(g[2]).toLocaleString()}</span>` : ''}`;
 
 document.addEventListener('mousemove', (e) => {
   if (e.target.closest?.('#chart, #devChart')) return;
@@ -1383,6 +1380,158 @@ function initControls() {
 
 // ---------- live data ----------
 
+// ---------- site: first-visit notice, donations, contact, people online ----------
+
+const SITE = {
+  telegram: 'idevstar',
+  amounts: [10, 100, 1000],
+  // Donation addresses (USDT). Each network has its own address; never mix them up.
+  networks: {
+    bep20: { name: 'BEP20', chain: 'BNB Smart Chain (BEP20)', address: '0x9C17C16a8213795Ee0944aD7c08F77Ab18ce3f2a' },
+    trc20: { name: 'TRC20', chain: 'TRON (TRC20)', address: 'TV47TjzyT1wG24DW2KYoNuckiHGt2WbjjB' },
+  },
+};
+const WELCOME_KEY = 'crash-welcome-v1';
+
+// One id per browser, so several open tabs count as one person online.
+function visitorId() {
+  try {
+    let id = localStorage.getItem('crash-cid');
+    if (!id) { id = crypto.randomUUID?.() || Math.random().toString(36).slice(2) + Date.now().toString(36); localStorage.setItem('crash-cid', id); }
+    return id;
+  } catch { return ''; }
+}
+
+async function copyText(text, btn) {
+  try { await navigator.clipboard.writeText(text); }
+  catch { // http on a local network has no clipboard API
+    const ta = Object.assign(document.createElement('textarea'), { value: text });
+    document.body.append(ta); ta.select(); document.execCommand('copy'); ta.remove();
+  }
+  const label = btn.innerHTML;
+  btn.innerHTML = icon('check') + 'Copied';
+  btn.classList.add('copied');
+  setTimeout(() => { btn.innerHTML = label; btn.classList.remove('copied'); }, 1600);
+}
+
+// QR codes come from a small library, loaded only when the donate window is first opened.
+let qrLib = null;
+function loadQr() {
+  qrLib ??= new Promise((resolve, reject) => {
+    const s = Object.assign(document.createElement('script'), { src: 'https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js' });
+    s.onload = () => (window.qrcode ? resolve(window.qrcode) : reject(new Error('no qrcode')));
+    s.onerror = reject;
+    document.head.append(s);
+  });
+  return qrLib;
+}
+
+const donate = { amount: 100, custom: false, net: 'bep20' };
+async function renderDonate() {
+  const net = SITE.networks[donate.net];
+  document.querySelectorAll('#donate .amt').forEach((b) => b.setAttribute('aria-pressed',
+    b.dataset.amt === 'custom' ? donate.custom : !donate.custom && +b.dataset.amt === donate.amount));
+  document.querySelectorAll('#donate [data-net]').forEach((b) => b.setAttribute('aria-pressed', b.dataset.net === donate.net));
+  $('customWrap').hidden = !donate.custom;
+  const amt = donate.custom ? +$('customAmt').value : donate.amount;
+  const ok = Number.isFinite(amt) && amt > 0;
+  $('payAmt').innerHTML = ok ? `${amt.toLocaleString(undefined, { maximumFractionDigits: 2 })} <small>USDT</small>` : '<small>Enter an amount</small>';
+  $('copyAmt').disabled = !ok;
+  $('payTo').textContent = `to this ${net.name} address`;
+  $('payAddr').textContent = net.address;
+  $('netWarn').innerHTML = `Send only <b>USDT</b> on <b>${net.chain}</b> to this address. Other tokens or networks can be lost for good.`;
+  const box = $('donateQr');
+  if (box.dataset.for === net.address) return;
+  box.dataset.for = net.address;
+  try {
+    const q = (await loadQr())(0, 'M');
+    q.addData(net.address); // the QR holds only the address, which every wallet understands
+    q.make();
+    box.innerHTML = `<img alt="QR code of the ${net.name} address" src="${q.createDataURL(6, 2)}">`;
+  } catch {
+    box.innerHTML = '<span class="sub">QR code unavailable — copy the address instead.</span>';
+  }
+}
+
+function initSite() {
+  // First visit: the notice stays until it is acknowledged.
+  const w = $('welcome');
+  let seen = false;
+  try { seen = !!localStorage.getItem(WELCOME_KEY); } catch {}
+  w.addEventListener('cancel', (e) => { if (!seen) e.preventDefault(); });
+  // Browsers let Esc close a dialog anyway before the visitor has clicked on the page, so
+  // reopen it until "I understand" is pressed.
+  w.addEventListener('close', () => { if (!seen) w.showModal(); });
+  $('welcomeOk').onclick = () => {
+    seen = true;
+    try { localStorage.setItem(WELCOME_KEY, new Date().toISOString()); } catch {}
+    w.close();
+  };
+  if (!seen) w.showModal();
+  const openAbout = (e) => { e?.preventDefault(); w.showModal(); };
+  $('aboutBtn').onclick = openAbout;
+
+  // Donate window
+  const d = $('donate');
+  const openDonate = () => { d.showModal(); renderDonate(); };
+  $('donateBtn').onclick = openDonate;
+  document.querySelectorAll('[data-open]').forEach((b) => (b.onclick = b.dataset.open === 'donate' ? openDonate : openAbout));
+  d.querySelector('[data-close]').onclick = () => d.close();
+  d.addEventListener('close', () => { if (location.hash === '#donate') history.replaceState(null, '', location.pathname); });
+  // Links to /#donate (e.g. from the guide) open it straight away, after the first-visit notice.
+  if (location.hash === '#donate') { if (seen) openDonate(); else w.addEventListener('close', () => seen && !d.open && openDonate(), { once: true }); }
+  d.addEventListener('click', (e) => { if (e.target === d) d.close(); }); // click on the backdrop
+  d.querySelector('.amounts').addEventListener('click', (e) => {
+    const b = e.target.closest('.amt');
+    if (!b) return;
+    donate.custom = b.dataset.amt === 'custom';
+    if (!donate.custom) donate.amount = +b.dataset.amt;
+    renderDonate();
+    if (donate.custom) $('customAmt').focus();
+  });
+  $('customAmt').addEventListener('input', renderDonate);
+  d.querySelector('.networks').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-net]');
+    if (b) { donate.net = b.dataset.net; renderDonate(); }
+  });
+  $('copyAddr').onclick = (e) => copyText(SITE.networks[donate.net].address, e.currentTarget);
+  $('copyAmt').onclick = (e) => {
+    const amt = donate.custom ? +$('customAmt').value : donate.amount;
+    if (amt > 0) copyText(String(amt), e.currentTarget);
+  };
+}
+
+// Rolling-digit counter for people online: each digit rolls to its new value, the pill
+// glows, and the change floats up (+1 / −1).
+let onlineNow = null;
+function setOdometer(el, value) {
+  const text = String(value);
+  if (el.dataset.len !== String(text.length)) {
+    // Digit count changed (or first value): rebuild the columns, then roll into place.
+    el.innerHTML = [...text].map(() => `<span class="odo-d"><span class="odo-s">${[...'0123456789'].map((d) => `<span>${d}</span>`).join('')}</span></span>`).join('');
+    el.dataset.len = text.length;
+    el.querySelectorAll('.odo-s').forEach((s) => { s.style.transition = 'none'; s.style.transform = 'translateY(0)'; });
+    void el.offsetWidth; // apply the start position before animating
+    el.querySelectorAll('.odo-s').forEach((s) => (s.style.transition = ''));
+  }
+  el.setAttribute('aria-label', text);
+  [...text].forEach((d, i) => { el.children[i].firstChild.style.transform = `translateY(-${+d * 10}%)`; });
+}
+function setOnline(n) {
+  const pill = $('online'), el = $('onlineNum');
+  setOdometer(el, n);
+  pill.classList.add('on');
+  if (onlineNow != null && n !== onlineNow) {
+    pill.classList.remove('bump', 'up', 'down');
+    void pill.offsetWidth; // restart the glow animation
+    pill.classList.add('bump', n > onlineNow ? 'up' : 'down');
+    const f = Object.assign(document.createElement('span'), { className: `odo-float ${n > onlineNow ? 'up' : 'down'}`, textContent: (n > onlineNow ? '+' : '−') + Math.abs(n - onlineNow) });
+    pill.append(f);
+    setTimeout(() => f.remove(), 1400);
+  }
+  onlineNow = n;
+}
+
 // ---------- connection + loading screen ----------
 
 // Steps shown while the first history loads: pending | active | done | error.
@@ -1414,7 +1563,7 @@ function loaded() {
 function connect() {
   loader.timer = setInterval(renderLoader, 1000);
   renderLoader();
-  const es = new EventSource('/events');
+  const es = new EventSource(`/events?cid=${visitorId()}`);
   es.onopen = () => {
     loader.server = 'done';
     if (loader.bc === 'pending') loader.bc = 'active';
@@ -1439,6 +1588,10 @@ function connect() {
     checkPlan(planBefore);
     generateStrategies(); // plans follow the history up to this round
     render(true);
+  });
+  es.addEventListener('presence', (e) => {
+    const { online } = JSON.parse(e.data);
+    setOnline(online);
   });
   es.addEventListener('status', (e) => {
     const s = JSON.parse(e.data);
@@ -1476,5 +1629,6 @@ initBoard();
 initChart();
 initDev();
 initStrategy();
+initSite();
 initControls();
 connect();

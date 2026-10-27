@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Guide · Crash Live Analysis</title>
+  <meta name="description" content="How Crash Live Analysis works: where the BC.Game Crash data comes from, what every number means, alerts, the strategy generator, privacy and FAQ.">
+  <meta name="theme-color" content="#121316">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23d95926'/%3E%3Cpath d='M6 24 L13 15 L18 19 L26 8' stroke='white' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="docs.css">
+</head>
+<body class="docs">
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <symbol id="i-back" viewBox="0 0 24 24"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></symbol>
+    <symbol id="i-send" viewBox="0 0 24 24"><path d="M22 2 11 13"/><path d="m22 2-7 20-4-9-9-4z"/></symbol>
+    <symbol id="i-heart" viewBox="0 0 24 24"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7z"/></symbol>
+  </svg>
+
+  <header class="top">
+    <a class="brand docs-brand" href="/">
+      <svg class="logo" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8"/><path d="M6 24 L13 15 L18 19 L26 8"/></svg>
+      <h1>Crash Live Analysis</h1>
+      <span class="docs-tag">Guide</span>
+    </a>
+    <div class="top-controls">
+      <a class="icon-btn" href="https://t.me/idevstar" target="_blank" rel="noopener" aria-label="Contact on Telegram" title="Telegram @idevstar"><svg class="ic" aria-hidden="true"><use href="#i-send"/></svg></a>
+      <a class="btn donate" href="/#donate"><svg class="ic" aria-hidden="true"><use href="#i-heart"/></svg>Donate</a>
+      <a class="btn primary" href="/"><svg class="ic" aria-hidden="true"><use href="#i-back"/></svg>Open dashboard</a>
+    </div>
+  </header>
+
+  <div class="docs-wrap">
+    <nav class="toc" aria-label="Contents">
+      <div class="toc-title">On this page</div>
+      <a href="#overview">Overview</a>
+      <a href="#start">Getting started</a>
+      <a href="#data">Where the data comes from</a>
+      <a href="#numbers">What the numbers mean</a>
+      <a href="#panels">The panels</a>
+      <a href="#strategy">Strategy generator</a>
+      <a href="#alerts">Alerts &amp; notifications</a>
+      <a href="#keys">Keyboard shortcuts</a>
+      <a href="#limits">What the numbers can't tell you</a>
+      <a href="#privacy">Privacy</a>
+      <a href="#faq">FAQ</a>
+      <a href="#contact">Contact &amp; support</a>
+    </nav>
+
+    <main class="doc">
+      <section id="overview">
+        <p class="eyebrow">Guide</p>
+        <h2 class="doc-title">How Crash Live Analysis works</h2>
+        <p class="lead">Crash Live Analysis shows BC.Game Crash results as they happen, together with tens of thousands of earlier
+          rounds, and turns them into statistics you can read at a glance: how often each multiplier appears, how long the gaps
+          between hits are, how far recent results are from the game's own odds, and reference strategies built from that history.</p>
+        <div class="callouts">
+          <div class="callout good"><b>Analysis only</b><span>It shows data and statistics. It never places bets or plays for you — it is not a bot.</span></div>
+          <div class="callout good"><b>No account, no connection</b><span>No sign-up, no login, no wallet or BC.Game account connection. We never ask for passwords, keys or funds.</span></div>
+          <div class="callout warn"><b>Independent of BC.Game</b><span>This service is not affiliated with BC.Game. It uses the game's public round history. 18+ only.</span></div>
+        </div>
+      </section>
+
+      <section id="start">
+        <h2>Getting started</h2>
+        <p>Open the dashboard and it loads the latest rounds automatically. The status pill next to the title tells you what is happening:
+          <span class="chip-ok">Live</span> means new rounds arrive as they finish (every few seconds);
+          <span class="chip-warn">Connecting</span> or <span class="chip-warn">Reconnecting</span> means it is reaching BC.Game;
+          <span class="chip-err">Unreachable</span> or <span class="chip-err">Server offline</span> means something is wrong and it keeps retrying.
+          The <b>online</b> counter shows how many people have the dashboard open right now.</p>
+        <ul>
+          <li><b>Sample</b> (top bar) — how many of the most recent rounds the statistics use, from 500 up to everything loaded. 2,000 is a good default.</li>
+          <li><b>Move panels</b> by dragging the ⠿ handle at a panel's top-left; change a panel's width with the ↔ button. Your layout is remembered in your browser; the ↺ button restores the default.</li>
+          <li><b>Hover</b> almost anything — a bar, a number, a column title — for an explanation or the exact values.</li>
+          <li><b>Latest</b> (top right) and the strip below the header show the most recent results; orange marks rounds at or above the chart threshold, green marks instant 1.00× crashes.</li>
+        </ul>
+      </section>
+
+      <section id="data">
+        <h2>Where the data comes from</h2>
+        <p>BC.Game publishes the latest 100 Crash rounds. The server reads them every 2 seconds. Everything older is rebuilt from
+          BC.Game's <b>provably-fair hash chain</b>: every round has a hash, and the previous round's hash is the SHA-256 of the current
+          one, so from the newest hash every earlier round can be recomputed — about 50,000 rounds (roughly two weeks) are kept.</p>
+        <p>Each round's crash point is calculated exactly the way the game does it, and the server checks its own results against the
+          100 rounds BC.Game reports:</p>
+        <pre class="formula">h = HMAC-SHA256(key = salt, message = round hash)
+X = first 52 bits of h ÷ 2^52
+crash = max(1.00, floor(99 ÷ (1 − X)) ÷ 100)</pre>
+        <p>Because of this, every number on the dashboard can be checked independently — the CSV export (Overview panel) includes each
+          round's hash.</p>
+        <p><b>Times.</b> Rounds the server saw live keep their real time (saved across restarts). Older rounds rebuilt from the hash chain
+          show only the round number and result.</p>
+      </section>
+
+      <section id="numbers">
+        <h2>What the numbers mean</h2>
+        <p>A <b>target</b> such as <code>≥ 10×</code> means "the round reached at least 10×"; <code>= 1.00×</code> means an instant crash.</p>
+        <dl class="glossary">
+          <dt>Default chance</dt><dd>The game's own probability per round: <b>99% ÷ target</b> (≥ 2× = 49.5%, ≥ 10× = 9.9%, ≥ 100× = 0.99%). An instant 1.00× crash has 2/101 ≈ 1.98%.</dd>
+          <dt>Avg every</dt><dd>Average number of rounds between hits = 1 ÷ default chance (≥ 100× about every 101 rounds; 1.00× about every 51).</dd>
+          <dt>Since</dt><dd>Rounds since the target last hit.</dd>
+          <dt>Observed</dt><dd>How often the target actually hit within the Sample.</dd>
+          <dt>Deviation (σ)</dt><dd>How far the observed count is from the expected count, in standard deviations. Within ±2σ is ordinary variation.</dd>
+          <dt>Adjusted gap</dt><dd>Average gap × (observed rate ÷ default rate). If a target has been hitting more often than its default chance, the adjusted gap is longer; less often, shorter.</dd>
+          <dt>Due %</dt><dd>The chance that a hit would have arrived within the current Since: 1 − (1 − p)<sup>Since</sup>. It rises every round without a hit.</dd>
+          <dt>Next in</dt><dd>Rounds left until Since reaches the adjusted gap (shown in red once it has passed).</dd>
+          <dt>Status</dt><dd>Since ÷ adjusted gap: <b>Early</b> under 0.5, <b>Building</b> under 1, <b>Due</b> under 2, <b>Overdue</b> from 2.</dd>
+          <dt>Balance</dt><dd>How many rounds without a hit would bring the observed rate back to the default (or how many hits it is behind).</dd>
+          <dt>Density</dt><dd>For a selected range of rounds: hits ÷ rounds × 100, compared with the expected density (the default chance).</dd>
+        </dl>
+        <p class="note-box">Due %, Adjusted gap, Next in and Status describe the history. The game's own chance for the <i>next</i> round is always the Default chance — see <a href="#limits">what the numbers can't tell you</a>.</p>
+      </section>
+
+      <section id="panels">
+        <h2>The panels</h2>
+        <h3>Trackers (100× and 1.00×)</h3>
+        <p>Two panels follow one target each — 100× and 1.00× by default; pick any target from the menu. The ring shows Due %, the big
+          number is Since with its status, and the bar compares Since with the average and adjusted gaps. Below it are the last 24 gaps
+          (orange = longer than average). The 🔔 sends an alert on every hit; "Alert when gap reaches" sends one when Since hits a number you choose.</p>
+        <h3>Overview</h3>
+        <p>Median, highest and instant-crash rate of the Sample, and a bar showing how rounds split into 1.00×, 1.01–2×, 2–10×, 10–100× and 100×+
+          (hover for observed vs. expected). <b>CSV</b> downloads the Sample with hashes.</p>
+        <h3>Rounds chart</h3>
+        <p>One bar per round on a log scale; blue below the threshold, orange at or above it, green dots mark 1.00× crashes.
+          Drag to scroll back through history, use the wheel or the magnifiers to zoom, and press <b>Live</b> to jump back to the newest round.
+          Switch to <b>Select</b> (or hold Shift) and drag to pick a range of rounds.</p>
+        <h3>Range density</h3>
+        <p>For the selected range: each target's hits, density and expected density, the difference and its deviation. Type round numbers
+          for an exact range, or use <b>Visible rounds</b> / <b>Sample</b>.</p>
+        <h3>Deviation</h3>
+        <p>How far each target's hit rate is from its default chance over time, in σ. <b>Rolling</b> uses the last Sample-size rounds at each point;
+          <b>Cumulative</b> counts from the start of the range. With <b>Sync with Rounds</b> on, it shows exactly the rounds of the Rounds chart,
+          each point under its bar, and pans, zooms and selects together with it.</p>
+        <h3>Probability board</h3>
+        <p>Every target in one table: default chance, average gap, hits vs. expected, observed rate, deviation, adjusted gap, Since, Due %,
+          Next in, status and longest gap. Add or remove targets, and turn on an alert per row (🔔) with its own threshold — for example
+          "alert when Since reaches 95% of the adjusted gap".</p>
+        <h3>Analysis</h3>
+        <p>The same view as the in-game history panel: pick a payout threshold to see each side's chance, count, longest run and current run,
+          and a page-by-page list of rounds.</p>
+      </section>
+
+      <section id="strategy">
+        <h2>Strategy generator</h2>
+        <p>Builds reference plans for the coming rounds from the history so far and rebuilds them after every new round. Each plan is a
+          <b>looping rule</b> for one target:</p>
+        <ol>
+          <li><b>Start</b> right away, or when Since reaches a share of the adjusted gap (your row alert %, 80% or 120%).</li>
+          <li><b>Bet one cycle</b>: until the first hit or a set number of bets (one, two or three average gaps), or every round of the cycle for "every round" plans.</li>
+          <li><b>Repeat</b>: after the cycle, wait for the trigger again — until you stop it.</li>
+        </ol>
+        <p><b>Staking:</b> <i>Flat</i> (the same stake), <i>Step-up</i> (double after ⅔ of the bets), <i>Recovery</i> (each stake sized to win back
+          the cycle's losses plus the first bet's win) or <i>Every round</i>. No cycle stakes more than your <b>Budget</b>; a plan that would, ends its cycle early.</p>
+        <p>Each plan is <b>simulated 1,000 times</b> over the next period from the default chance, and <b>replayed over every past period</b> of the
+          loaded history ("history"). Cards show the first start, the cycle rule, chance of profit, expected profit, about how many cycles fit, a
+          1-in-20 bad case and the all-miss loss. <b>Risk</b> (0–100) = 50 × chance of ending down + 50 × the bad-case loss as a share of the budget.
+          Choose how plans are ranked with <b>Goal</b>: balanced, lowest risk, best history or biggest win.</p>
+        <p><b>Track plan</b> follows a plan live: it tells you when the next cycle starts and what to stake, counts cycles, bets and P&amp;L, and alerts
+          you before each cycle, on a hit and when a cycle is lost. An optional <b>stop-loss</b> stops it once the total loss reaches your limit
+          (counted from when you set it); <b>Restart from now</b> resumes with fresh counters. You place any bets yourself — tracking only keeps score.</p>
+        <p class="note-box">Because every bet returns 99% of its stake on average, every plan's <b>expected total multiplier is ×0.990</b>. Plans differ in
+          risk and in how results are spread, not in expected value. Treat them as reference, not as a way to win.</p>
+      </section>
+
+      <section id="alerts">
+        <h2>Alerts &amp; notifications</h2>
+        <ul>
+          <li>Click <b>Enable desktop alerts</b> in the top bar and allow notifications. Alerts then appear on your desktop even when another window is in front, stay until dismissed, and bring the dashboard forward when clicked.</li>
+          <li>Alerts also show inside the page with a sound (🔊 turns the sound on or off) and count up in the tab title.</li>
+          <li>Sources: tracker hit and gap alerts, Probability board row alerts, and plan tracking.</li>
+          <li>Desktop alerts need the dashboard opened over <b>https</b> (or on the same computer as <code>localhost</code>), notifications allowed for the site in your browser, and your system's notifications on (Windows: Settings → System → Notifications; Do not disturb off).</li>
+          <li>Alerts only run while a dashboard tab is open. In Chrome, add the site under Settings → Performance → "Always keep these sites active" so the tab is never put to sleep.</li>
+        </ul>
+      </section>
+
+      <section id="keys">
+        <h2>Keyboard shortcuts</h2>
+        <div class="keys">
+          <span><kbd>P</kbd> Pan mode</span><span><kbd>S</kbd> Select mode</span><span><kbd>L</kbd> Jump to live</span>
+          <span><kbd>+</kbd> / <kbd>−</kbd> Zoom</span><span><kbd>Esc</kbd> Clear selection</span><span><kbd>Shift</kbd> + drag Select a range</span>
+        </div>
+        <p>Shortcuts are ignored while you type in a field.</p>
+      </section>
+
+      <section id="limits">
+        <h2>What the numbers can't tell you</h2>
+        <p>Every round is fixed in advance by the hash chain and is <b>independent of earlier rounds</b>. However long a target has not hit,
+          the chance for the next round stays at its default chance. A long gap makes the gap <i>rarer</i>, not the next hit more likely;
+          over many rounds the observed rate drifts toward the default because of the sheer number of new rounds, not because the game "catches up".</p>
+        <p>Every bet returns 99% of its stake on average (a 1% house edge), so no timing, target or staking plan changes the long-run result.
+          Use the dashboard to understand the game — not as a promise of profit. Only play with money you can afford to lose. 18+.</p>
+      </section>
+
+      <section id="privacy">
+        <h2>Privacy</h2>
+        <ul>
+          <li>No account, no sign-up, no login, and no connection to your wallet or BC.Game account.</li>
+          <li>Your settings (layout, targets, alerts, tracked plan) are stored only in your own browser and never sent to the server.</li>
+          <li>To count people online, your browser keeps a random anonymous id (so several tabs count once) and sends it while the dashboard is open. It is not linked to you, and the server only holds it while the page is open.</li>
+          <li>No advertising and no analytics trackers. The page loads its font from Google Fonts and, when you open Donate, a small QR-code library from jsDelivr.</li>
+        </ul>
+      </section>
+
+      <section id="faq">
+        <h2>FAQ</h2>
+        <details><summary>Is this a bot? Can it bet for me?</summary><p>No. It only shows data and statistics. It never places bets and has no access to any account.</p></details>
+        <details><summary>Do I need an account or to connect my wallet?</summary><p>No. There is nothing to sign up for or connect. Never share your BC.Game login, wallet keys or seed phrase with anyone.</p></details>
+        <details><summary>Can it predict the next round?</summary><p>No one can. Results come from a hash chain committed in advance; each round is independent. The statistics describe the past.</p></details>
+        <details><summary>Is it affiliated with BC.Game?</summary><p>No. It is an independent project that reads BC.Game's public round history.</p></details>
+        <details><summary>Why do older rounds have no time?</summary><p>BC.Game only reports times for the latest 100 rounds. Older rounds are rebuilt from the hash chain, which contains results but not times.</p></details>
+        <details><summary>Why are my desktop alerts not showing?</summary><p>Allow notifications for the site, open it over https (or on localhost), keep the tab open, and check your system's notification settings. See <a href="#alerts">Alerts</a>.</p></details>
+        <details><summary>Does my layout or tracked plan sync between devices?</summary><p>No — they are saved only in the browser you use. Each device has its own.</p></details>
+      </section>
+
+      <section id="contact">
+        <h2>Contact &amp; support</h2>
+        <p>Questions, ideas or problems? Message <a href="https://t.me/idevstar" target="_blank" rel="noopener">@idevstar on Telegram</a>.</p>
+        <p>The service is free. If it helps you, you can support it with a USDT donation (BEP20 or TRC20).</p>
+        <div class="contact-actions">
+          <a class="btn" href="https://t.me/idevstar" target="_blank" rel="noopener"><svg class="ic" aria-hidden="true"><use href="#i-send"/></svg>Telegram @idevstar</a>
+          <a class="btn donate" href="/#donate"><svg class="ic" aria-hidden="true"><use href="#i-heart"/></svg>Donate</a>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <footer class="foot">
+    <span>Analysis only · not a bot · no account or wallet connection · not affiliated with BC.Game · 18+</span>
+    <span><a class="link" href="/">Dashboard</a> · <a class="link" href="https://t.me/idevstar" target="_blank" rel="noopener">Telegram @idevstar</a></span>
+  </footer>
+
+  <script>
+    // Highlight the section being read in the table of contents.
+    const links = [...document.querySelectorAll('.toc a')];
+    const byId = new Map(links.map((a) => [a.hash.slice(1), a]));
+    const io = new IntersectionObserver((entries) => {
+      for (const e of entries) if (e.isIntersecting) {
+        links.forEach((a) => a.classList.remove('active'));
+        byId.get(e.target.id)?.classList.add('active');
+      }
+    }, { rootMargin: '-20% 0px -70% 0px' });
+    document.querySelectorAll('.doc section').forEach((s) => io.observe(s));
+  </script>
+</body>
+</html>

@@ -37,26 +37,40 @@ const prevHash = (hash) => crypto.createHash('sha256').update(hash).digest('hex'
 
 // ---------- round times ----------
 
-// The API only reports times for the latest 100 rounds. Every real time we see is
-// kept in `realTimes` (and saved to disk); other rounds get an estimate.
+// The API only reports times for the latest 100 rounds. Every real time we see is kept in
+// `realTimes` and saved to disk, so rounds seen live keep their time across restarts.
+// Older rounds rebuilt from the hash chain have no time.
 const realTimes = new Map(); // id -> endTime ms
 try {
   for (const [id, t] of Object.entries(JSON.parse(fs.readFileSync(TIMES_FILE, 'utf8')))) realTimes.set(+id, t);
   console.log(`loaded ${realTimes.size} saved round times`);
 } catch {}
 
-let timesDirty = false;
+let timesDirty = false, saveFailing = false;
 function saveTimes() {
   if (!timesDirty) return;
-  timesDirty = false;
   const lowest = games.at(-1)?.id ?? 0;
   for (const id of realTimes.keys()) if (id < lowest) realTimes.delete(id);
+  const data = JSON.stringify(Object.fromEntries(realTimes));
   try {
     fs.mkdirSync(path.dirname(TIMES_FILE), { recursive: true });
-    fs.writeFileSync(TIMES_FILE + '.tmp', JSON.stringify(Object.fromEntries(realTimes)));
-    fs.renameSync(TIMES_FILE + '.tmp', TIMES_FILE);
+    try {
+      fs.writeFileSync(TIMES_FILE + '.tmp', data);
+      fs.renameSync(TIMES_FILE + '.tmp', TIMES_FILE); // atomic replace
+    } catch (e) {
+      // Windows refuses the replace while something holds the file open (another copy of the
+      // server, an editor, antivirus). Write it in place instead.
+      if (e.code !== 'EBUSY' && e.code !== 'EPERM' && e.code !== 'EACCES') throw e;
+      fs.writeFileSync(TIMES_FILE, data);
+      try { fs.unlinkSync(TIMES_FILE + '.tmp'); } catch {}
+    }
+    timesDirty = false;
+    if (saveFailing) console.log('round times saved again');
+    saveFailing = false;
   } catch (e) {
-    console.error('could not save round times:', e.message);
+    // Keep the data and retry on the next interval; say so once, not every 10 seconds.
+    if (!saveFailing) console.error(`could not save round times (${e.code || e.message}); will keep retrying. Is another copy of the server running?`);
+    saveFailing = true;
   }
 }
 setInterval(saveTimes, 10000);
@@ -65,62 +79,23 @@ function recordTimes(latest) {
   for (const g of latest) if (g.t && realTimes.get(g.id) !== g.t) { realTimes.set(g.id, g.t); timesDirty = true; }
 }
 
-// A round's multiplier grows as e^(0.00006 · ms), so its flight lasts ln(rate) / 0.00006 ms.
-// Round-to-round time = a fixed pause (betting + countdown, ~11.7 s) + that flight.
-const GROWTH = 0.00006;
-const flightMs = (rate) => Math.log(rate) / GROWTH;
-
-// Long-run average pause, measured across every span between rounds with real times:
-// (elapsed time − flight time) ÷ rounds. Includes the occasional longer breaks, which
-// the last 100 rounds alone under-count, so it needs a few thousand rounds of coverage.
-const DEFAULT_PAUSE = +process.env.DEFAULT_PAUSE_MS || 12300; // measured over ~76 h of real round times (Oct 2026)
-function calibratePause() {
-  let elapsed = 0, flights = 0, rounds = 0, prev = -1;
-  for (let i = 0; i < games.length; i++) {
-    const t = realTimes.get(games[i].id);
-    if (t == null) continue;
-    if (prev >= 0) {
-      for (let x = prev; x < i; x++) flights += flightMs(games[x].rate);
-      elapsed += realTimes.get(games[prev].id) - t;
-      rounds += i - prev;
-    }
-    prev = i;
-  }
-  return rounds >= 2000 ? (elapsed - flights) / rounds : DEFAULT_PAUSE;
-}
-
-// Real time where known; otherwise step back from the next newer round. A run of
-// estimates that ends at an older real time is stretched so both ends line up.
-function fillTimes() {
-  const pause = calibratePause();
-  let i = 0;
-  while (i < games.length) {
-    const known = realTimes.get(games[i].id);
-    if (known != null) { games[i].t = known; games[i].est = false; i++; continue; }
-    let j = i;
-    while (j < games.length && !realTimes.has(games[j].id)) j++;
-    for (let x = i; x < j; x++) {
-      const newer = games[x - 1];
-      games[x].t = newer?.t != null ? newer.t - (pause + flightMs(newer.rate)) : null;
-      games[x].est = true;
-    }
-    if (i > 0 && j < games.length) {
-      const predicted = games[j - 1].t - (pause + flightMs(games[j - 1].rate));
-      const diff = realTimes.get(games[j].id) - predicted, len = j - i + 1;
-      for (let x = i; x < j; x++) games[x].t += (diff * (x - i + 1)) / len;
-    }
-    i = j;
-  }
-}
-
 // ---------- state ----------
 
-let games = []; // newest first: { id, rate, hash, t, est }  (t = endTime ms; est = true if estimated)
+let games = []; // newest first: { id, rate, hash, t }  (t = endTime ms, null if not seen live)
 let salt = null;
 let activeHost = HOSTS[0];
 // state: 'connecting' (no data yet) | 'ok' | 'error' (last poll failed; retrying)
 let status = { ok: false, state: 'connecting', error: null, host: activeHost, lastPoll: 0, failures: 0, proxy: false, retryMs: 0 };
 const clients = new Set();
+const viewers = new Map(); // SSE response -> visitor id (one per browser, so several tabs count once)
+
+// People online = distinct visitor ids with the page open. Sent to everyone when it changes.
+let presenceTimer = null;
+const online = () => new Set(viewers.values()).size;
+function schedulePresence() {
+  clearTimeout(presenceTimer);
+  presenceTimer = setTimeout(() => broadcast('presence', { online: online() }), 400); // one update per burst
+}
 
 // ---------- fetching ----------
 
@@ -220,8 +195,8 @@ function rebuild(latest) {
   if (bad.length) console.warn(`warning: ${bad.length} derived results differ from API`);
   games = chain;
   recordTimes(latest);
-  fillTimes();
-  const real = games.filter((g) => !g.est).length;
+  for (const g of games) g.t = realTimes.get(g.id) ?? null;
+  const real = games.filter((g) => g.t != null).length;
   console.log(`built history: ${games.length} rounds (#${games.at(-1).id} .. #${games[0].id}), ${real} with real times`);
   broadcast('snapshot', snapshot());
 }
@@ -239,7 +214,7 @@ function update(latest) {
     return rebuild(latest);
   }
   recordTimes(latest);
-  for (const g of fresh) { g.t = realTimes.get(g.id) ?? null; g.est = g.t == null; }
+  for (const g of fresh) g.t = realTimes.get(g.id) ?? null;
   games = fresh.concat(games).slice(0, DEPTH);
   broadcast('games', fresh.reverse().map(pack)); // oldest first
 }
@@ -260,7 +235,7 @@ async function poll() {
 
 // ---------- SSE + HTTP ----------
 
-const pack = (g) => [g.id, g.rate, g.t == null ? null : Math.round(g.t), g.est ? 1 : 0];
+const pack = (g) => [g.id, g.rate, g.t];
 const snapshot = () => ({ games: games.map(pack), salt, latestHash: games[0]?.hash ?? null });
 
 function broadcast(event, data) {
@@ -278,25 +253,29 @@ const server = http.createServer((req, res) => {
     res.write(`event: snapshot\ndata: ${JSON.stringify(snapshot())}\n\n`);
     res.write(`event: status\ndata: ${JSON.stringify(status)}\n\n`);
     clients.add(res);
-    req.on('close', () => clients.delete(res));
+    const cid = url.searchParams.get('cid');
+    viewers.set(res, /^[A-Za-z0-9-]{8,64}$/.test(cid || '') ? cid : crypto.randomUUID());
+    res.write(`event: presence\ndata: ${JSON.stringify({ online: online() })}\n\n`);
+    schedulePresence();
+    req.on('close', () => { clients.delete(res); viewers.delete(res); schedulePresence(); });
     return;
   }
 
   if (url.pathname === '/api/history') {
     const limit = Math.min(+url.searchParams.get('limit') || 2000, games.length);
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    return res.end(JSON.stringify(games.slice(0, limit).map(({ id, rate, hash, t, est }) =>
-      ({ id, rate, hash, endTime: t == null ? null : Math.round(t), timeEstimated: !!est }))));
+    return res.end(JSON.stringify(games.slice(0, limit).map(({ id, rate, hash, t }) => ({ id, rate, hash, endTime: t }))));
   }
 
   if (url.pathname === '/api/history.csv') {
     const limit = Math.min(+url.searchParams.get('limit') || games.length, games.length);
     res.writeHead(200, { 'Content-Type': 'text/csv', 'Content-Disposition': 'attachment; filename="crash-history.csv"' });
-    return res.end('gameId,crash,hash,endTime,timeEstimated\n' + games.slice(0, limit)
-      .map((g) => `${g.id},${g.rate.toFixed(2)},${g.hash},${g.t ? new Date(g.t).toISOString() : ''},${g.est ? 1 : 0}`).join('\n'));
+    return res.end('gameId,crash,hash,endTime\n' + games.slice(0, limit)
+      .map((g) => `${g.id},${g.rate.toFixed(2)},${g.hash},${g.t ? new Date(g.t).toISOString() : ''}`).join('\n'));
   }
 
-  const file = path.normalize(path.join(PUBLIC_DIR, url.pathname === '/' ? 'index.html' : url.pathname));
+  const page = { '/': 'index.html', '/docs': 'docs.html', '/docs/': 'docs.html' }[url.pathname] || url.pathname;
+  const file = path.normalize(path.join(PUBLIC_DIR, page));
   if (!file.startsWith(PUBLIC_DIR)) return res.writeHead(403).end();
   fs.readFile(file, (err, buf) => {
     if (err) return res.writeHead(404).end('Not found');
