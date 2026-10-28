@@ -121,7 +121,7 @@ const GOALS = {
 
 self.onmessage = (e) => {
   const t0 = performance.now();
-  const { at, rates, targets, rowPct, period: H, stake: b, budget, window: w0, goal, onePay, sims = 1000 } = e.data;
+  const { at, rates, targets, rowPct, period: H, stake: b, budget, window: w0, goal, onePay, sims = 1000, source } = e.data;
   const n = rates.length, w = Math.max(1, Math.min(w0, n - 1));
   const cands = [], seen = new Set();
   for (const x of targets) {
@@ -159,5 +159,5 @@ self.onmessage = (e) => {
   const list = [], used = new Set();
   for (const c of cands) if (list.length < 5 && Number.isFinite(c.score) && !used.has(c.x)) { list.push(c); used.add(c.x); }
   for (const c of cands) if (list.length < 5 && Number.isFinite(c.score) && !list.includes(c)) list.push(c);
-  self.postMessage({ at, list, tried: cands.length, ms: Math.round(performance.now() - t0), window: w, period: H });
+  self.postMessage({ at, list, tried: cands.length, ms: Math.round(performance.now() - t0), window: w, period: H, source });
 };

@@ -29,6 +29,7 @@ const DEFAULTS = {
   sel: null, // selected range on the Rounds chart: { from, to } round ids
   devRange: 5000,
   devSync: true, // Deviation chart shows the same rounds as the Rounds chart
+  source: 'real', // 'real' = BC.Game rounds, 'sandbox' = the play-money game
   layout: null, // [[cardId, span], ...]
 };
 
@@ -36,7 +37,7 @@ let S = loadSettings();
 if (S.plan && S.plan.fromId == null) S.plan = null; // one-shot plan from an older version
 let games = []; // newest first: [id, rate, endTime|null]
 let page = 1;
-const byId = new Map();
+let byId = new Map(); // rounds of the active source by id
 
 // ---------- settings ----------
 
@@ -830,11 +831,12 @@ function generateStrategies() {
   const rowPct = Object.fromEntries(S.targets.map((x) => [x, rowPctOf(x)]));
   stratWorker.postMessage({
     at: games[0][0], rates, targets: S.targets, rowPct, period: S.stratPeriod, stake: S.stratStake,
-    budget: S.stratBudget, window: win(), goal: S.stratGoal, onePay: S.onePay,
+    budget: S.stratBudget, window: win(), goal: S.stratGoal, onePay: S.onePay, source: S.source,
   }, [rates.buffer]);
   renderStrategy();
 }
 stratWorker.onmessage = (e) => {
+  if (e.data.source !== S.source) { stratJob.busy = false; generateStrategies(); return; } // built for the other source
   strat = e.data;
   stratJob.busy = false;
   if (stratJob.again) { stratJob.again = false; generateStrategies(); }
@@ -938,7 +940,7 @@ function planReplay(pl) {
 }
 
 function checkPlan(before) {
-  if (!S.plan || !before) return;
+  if (!planHere() || !before) return;
   const pl = S.plan, now = planReplay(pl);
   if (!now) return;
   if (now.stopped && pl.stoppedAt == null) { pl.stoppedAt = now.stopId; save(); } // a stop is permanent
@@ -951,6 +953,14 @@ function checkPlan(before) {
 
 function renderPlanBox() {
   const box = $('planBox');
+  if (S.plan && !planHere()) {
+    box.hidden = false;
+    box.innerHTML = `<div class="pb-main"><span class="label">Tracking</span><b>Follow ${tlabel(S.plan.x)} · ${STAKING[S.plan.plan]}</b>
+      <span class="phase" style="--c: var(--text-muted)">Paused</span></div>
+      <div class="pb-next">This plan follows ${srcName(S.plan.source)} rounds. Switch to ${srcName(S.plan.source)} to see and continue it.</div>
+      <button class="btn small ghost" id="planStop">${icon('stop')}Stop</button>`;
+    return;
+  }
   if (!S.plan || !games.length) { box.hidden = true; return; }
   if (document.activeElement?.id === 'planSL') return; // don't wipe the stop-loss being typed
   const pl = S.plan, st = planReplay(pl);
@@ -1021,7 +1031,7 @@ function initStrategy() {
     if (!b || !strat) return;
     const c = strat.list[+b.dataset.i];
     S.plan = { x: c.x, pay: c.pay, p: c.p, avg: c.avg, f: c.f, plan: c.plan, every: c.every, stakes: c.stakes,
-      w: strat.window, fromId: games[0][0], stopLoss: null };
+      w: strat.window, fromId: games[0][0], stopLoss: null, source: S.source };
     save();
     await askNotifyPermission();
     render();
@@ -1279,6 +1289,7 @@ function initControls() {
   // Keyboard shortcuts for the round charts (ignored while typing in a field).
   document.addEventListener('keydown', (e) => {
     if (e.ctrlKey || e.metaKey || e.altKey || e.target.closest?.('input, select, textarea')) return;
+    if (e.key === ' ' && isSandbox() && !e.target.closest?.('button, a, summary')) { e.preventDefault(); playAction(); return; }
     const k = e.key.toLowerCase();
     if (k === 'p') S.chartMode = 'pan';
     else if (k === 's') S.chartMode = 'select';
@@ -1532,6 +1543,318 @@ function setOnline(n) {
   onlineNow = n;
 }
 
+// ---------- data source: real BC.Game rounds or the sandbox game ----------
+
+const store = {
+  real: { games: [], byId: new Map() },
+  sandbox: { games: [], byId: new Map(), loaded: false, loading: null, pending: [], fair: null },
+};
+const isSandbox = () => S.source === 'sandbox';
+const srcName = (s) => (s === 'sandbox' ? 'Sandbox' : 'Real');
+// A tracked plan follows the rounds of the source it was started on.
+const planHere = () => !!S.plan && (S.plan.source || 'real') === S.source;
+
+// Point every panel at the chosen source's rounds.
+function activateSource() {
+  const st = store[S.source];
+  games = st.games;
+  byId = st.byId;
+  view.offset = 0; view.hover = -1; S.sel = null; page = 1;
+  for (const k of Object.keys(fired)) delete fired[k];
+  document.body.classList.toggle('sandbox', isSandbox());
+  $('sbxBanner').hidden = !isSandbox();
+  $('srcReal').setAttribute('aria-pressed', !isSandbox());
+  $('srcSandbox').setAttribute('aria-pressed', isSandbox());
+  strat = null;
+  if (games.length) { loaded(); checkAlerts(null); generateStrategies(); }
+  render();
+}
+
+function loadSandbox() {
+  const sb = store.sandbox;
+  sb.loading ??= fetch('/api/sandbox/history', { cache: 'no-store' })
+    .then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
+    .then((d) => {
+      // Fill in place so references to the array stay valid.
+      sb.games.length = 0;
+      for (const g of d.games) sb.games.push(g);
+      for (const row of sb.pending.sort((a, b) => a[0] - b[0])) if (!sb.games.length || row[0] > sb.games[0][0]) sb.games.unshift(row);
+      sb.pending.length = 0;
+      sb.byId.clear();
+      for (const g of sb.games) sb.byId.set(g[0], g);
+      sb.fair = { salt: d.salt, commit: d.commit };
+      sb.loaded = true;
+    })
+    .catch((e) => { sb.loading = null; throw e; });
+  return sb.loading;
+}
+
+async function setSource(src) {
+  if (src === 'sandbox' && !store.sandbox.loaded) {
+    $('srcSandbox').classList.add('busy');
+    try { await loadSandbox(); }
+    catch {
+      toast('Sandbox unavailable', 'The sandbox history could not be loaded. Please try again in a moment.');
+      if (S.source === 'sandbox') { S.source = 'real'; save(); activateSource(); }
+      return;
+    } finally { $('srcSandbox').classList.remove('busy'); }
+  }
+  S.source = src;
+  save();
+  activateSource();
+}
+
+// ---------- sandbox crash game (play money) ----------
+
+const PLAY_KEY = 'crash-sbx-player';
+const PLAY_START = 1000;
+const G = 0.00006; // flight speed: the multiplier grows as e^(G · ms), as in the real game
+const play = { state: null, offset: 0, bet: null, next: null, last: null, player: loadPlayer(), noteTimer: 0 };
+play.bet = play.player.bet || null;
+delete play.player.bet;
+
+function loadPlayer() {
+  try {
+    const p = JSON.parse(localStorage.getItem(PLAY_KEY));
+    if (p && Number.isFinite(p.balance) && Array.isArray(p.bets)) return p;
+  } catch {}
+  return { balance: PLAY_START, bets: [] };
+}
+// The open bet is saved with the balance, so a reload mid-round never loses the stake.
+function savePlayer() { try { localStorage.setItem(PLAY_KEY, JSON.stringify({ ...play.player, bet: play.bet })); } catch {} }
+const serverNow = () => Date.now() + play.offset;
+const coins = (v) => v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+function multNow() {
+  const s = play.state;
+  if (!s || s.phase === 'betting') return 1;
+  if (s.phase === 'crashed') return s.rate;
+  return Math.max(1, Math.floor(100 * Math.exp(G * Math.max(0, serverNow() - s.startAt))) / 100);
+}
+
+function playNote(msg, ms = 4000) {
+  $('playNote').textContent = msg;
+  clearTimeout(play.noteTimer);
+  play.noteTimer = setTimeout(() => ($('playNote').textContent = ''), ms);
+}
+
+// A bet from an earlier round (e.g. placed before a reload) is settled from the history, or refunded.
+function resolveStaleBet(currentId) {
+  const b = play.bet;
+  if (!b || b.id >= currentId) return;
+  const row = store.sandbox.byId.get(b.id);
+  if (row) settle({ id: b.id, rate: row[1] });
+  else { play.player.balance += b.amount; play.bet = null; savePlayer(); }
+}
+
+function onSandboxState(s) {
+  const prev = play.state;
+  play.offset = s.now - Date.now();
+  play.state = s;
+  resolveStaleBet(s.id);
+  if (s.phase === 'betting' && (!prev || prev.id !== s.id) && play.next) {
+    const n = play.next;
+    play.next = null;
+    placeBet(n.amount, n.auto, true);
+  }
+  if (s.phase === 'crashed') { play.last = s; settle(s); }
+  renderPlay();
+}
+
+function placeBet(amount, auto, queued = false) {
+  const p = play.player;
+  if (!(amount >= 1)) return playNote('Enter a bet of at least 1.');
+  if (amount > p.balance + 1e-9) return playNote(queued ? 'Your queued bet was skipped: not enough balance.' : 'Not enough balance. Reset your balance to keep playing.');
+  p.balance -= amount;
+  play.bet = { id: play.state.id, amount, auto: auto >= 1.01 ? Math.round(auto * 100) / 100 : null, cashedAt: null };
+  savePlayer();
+}
+
+function cashOut(m) {
+  const b = play.bet;
+  if (!b || b.cashedAt != null) return;
+  b.cashedAt = m; // confirmed when the round's crash point arrives
+  savePlayer();
+  renderPlay();
+}
+
+// Settle when the crash point is known: a cash-out counts only at or below it.
+function settle(s) {
+  const b = play.bet;
+  if (!b || b.id !== s.id) return;
+  const won = b.cashedAt != null && b.cashedAt <= s.rate;
+  const payout = won ? b.amount * b.cashedAt : 0;
+  play.player.balance += payout;
+  play.player.bets.unshift({ id: b.id, amount: b.amount, cashedAt: won ? b.cashedAt : null, late: b.cashedAt != null && !won, rate: s.rate, profit: payout - b.amount });
+  play.player.bets.length = Math.min(play.player.bets.length, 30);
+  play.bet = null;
+  savePlayer();
+}
+
+function playAction() {
+  const s = play.state;
+  if (!s) return;
+  const b = play.bet;
+  if (b && b.id === s.id) {
+    if (s.phase === 'betting') { play.player.balance += b.amount; play.bet = null; savePlayer(); playNote('Bet cancelled.', 2000); }
+    else if (s.phase === 'running' && b.cashedAt == null) cashOut(multNow());
+    return renderPlay();
+  }
+  if (play.next) { play.next = null; playNote('Next-round bet cancelled.', 2000); return renderPlay(); }
+  const amount = Math.round(+$('playAmt').value * 100) / 100, auto = +$('playAuto').value;
+  if (s.phase === 'betting') placeBet(amount, auto);
+  else if (!(amount >= 1)) playNote('Enter a bet of at least 1.');
+  else if (amount > play.player.balance + 1e-9) playNote('Not enough balance. Reset your balance to keep playing.');
+  else { play.next = { amount, auto }; playNote('Your bet will be placed when the next round opens.'); }
+  renderPlay();
+}
+
+// Button text and colour for the current moment.
+function playButton() {
+  const s = play.state, b = play.bet;
+  if (!s) return { text: 'Connecting…', cls: '', disabled: true };
+  if (b && b.id === s.id) {
+    if (s.phase === 'betting') return { text: `Cancel bet · ${coins(b.amount)}`, cls: 'cancel' };
+    if (s.phase === 'running' && b.cashedAt == null) return { text: `Cash out ${coins(b.amount * multNow())}`, cls: 'cash' };
+    if (b.cashedAt != null) return { text: `Cashed out at ${b.cashedAt.toFixed(2)}×`, cls: 'done', disabled: true };
+  }
+  if (play.next) return { text: 'Cancel next-round bet', cls: 'cancel' };
+  return s.phase === 'betting' ? { text: 'Place bet', cls: 'bet' } : { text: 'Bet on next round', cls: 'bet' };
+}
+
+function renderPlay() {
+  if (!$('playBtn')) return;
+  const p = play.player, s = play.state;
+  $('playBal').textContent = coins(p.balance);
+  const btn = playButton(), el = $('playBtn');
+  el.textContent = btn.text;
+  el.className = `btn play-btn ${btn.cls}`;
+  el.disabled = !!btn.disabled;
+  $('playRound').textContent = s ? `Round #${s.id}` : '';
+  $('myBets').innerHTML = p.bets.length
+    ? p.bets.slice(0, 12).map((r) => `<div class="mb-row">
+        <span class="mono">#${r.id}</span><span>${coins(r.amount)}</span>
+        <span class="${r.cashedAt ? 'pos' : 'dim'}">${r.cashedAt ? `${r.cashedAt.toFixed(2)}×` : r.late ? 'too late' : `crash ${r.rate.toFixed(2)}×`}</span>
+        <b class="${r.profit > 0 ? 'pos' : 'neg'}">${r.profit > 0 ? '+' : '−'}${coins(Math.abs(r.profit))}</b></div>`).join('')
+    : '<div class="sub">No bets yet. Place one during the countdown.</div>';
+  const f = store.sandbox.fair || (s && { salt: s.salt, commit: s.commit });
+  const last = play.last;
+  $('fairInfo').innerHTML = f ? `
+    <p>Every sandbox round comes from a hash chain made before the first round. Its final link was published as the
+      <b>commitment</b>; each round's hash is revealed when it crashes, and sha256 of a round's hash equals the previous round's hash.</p>
+    <div class="kv1"><span>Commitment</span><code>${f.commit}</code></div>
+    <div class="kv1"><span>Salt</span><code>${f.salt}</code></div>
+    ${last ? `<div class="kv1"><span>Round #${last.id} hash</span><code>${last.hash}</code></div>
+      <p class="sub">crash = max(1.00, floor(99 ÷ (1 − X)) ÷ 100), X = first 52 bits of HMAC-SHA256(key = salt, message = hash) ÷ 2^52 → ${last.rate.toFixed(2)}×</p>` : ''}` : '';
+  updatePlayLive();
+}
+
+// Parts that change every frame.
+function updatePlayLive() {
+  const s = play.state;
+  if (!s) return;
+  const mult = $('playMult'), sub = $('playSub'), bar = $('playProgress');
+  mult.className = `play-mult ${s.phase}`;
+  if (s.phase === 'betting') {
+    const left = Math.max(0, s.bettingEndsAt - serverNow());
+    mult.textContent = `${(left / 1000).toFixed(1)}s`;
+    sub.textContent = 'Place your bets';
+    bar.style.width = `${Math.min(100, (left / 7000) * 100)}%`;
+  } else {
+    mult.textContent = s.phase === 'crashed' ? `${s.rate.toFixed(2)}×` : `${multNow().toFixed(2)}×`;
+    sub.textContent = s.phase === 'crashed' ? 'Crashed' : 'Flying…';
+    bar.style.width = '0%';
+  }
+  const b = play.bet;
+  if (b && b.id === s.id && s.phase === 'running' && b.cashedAt == null) $('playBtn').textContent = `Cash out ${coins(b.amount * multNow())}`;
+}
+
+function niceMultStep(v) {
+  const p = 10 ** Math.floor(Math.log10(v));
+  return [1, 2, 2.5, 5, 10].map((k) => k * p).find((x) => x >= v) || 10 * p;
+}
+
+function drawPlay() {
+  const cv = $('playCanvas'), wrap = cv.parentElement, s = play.state;
+  const W = wrap.clientWidth, H = wrap.clientHeight;
+  if (!W || !s) return;
+  const dpr = devicePixelRatio || 1;
+  if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)) { cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
+  const ctx = cv.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, W, H);
+  const css = getComputedStyle(document.documentElement), c = (n) => css.getPropertyValue(n).trim();
+  const m = { l: 48, r: 18, t: 18, b: 28 }, iw = W - m.l - m.r, ih = H - m.t - m.b;
+  let tMs = 0, cur = 1;
+  if (s.phase === 'running') { tMs = Math.max(0, serverNow() - s.startAt); cur = Math.exp(G * tMs); }
+  else if (s.phase === 'crashed') { tMs = Math.log(s.rate) / G; cur = s.rate; }
+  const tMax = Math.max(10000, tMs * 1.15), yMax = Math.max(2, 1 + (cur - 1) * 1.3);
+  const x = (t) => m.l + (t / tMax) * iw, y = (v) => m.t + ih - ((v - 1) / (yMax - 1)) * ih;
+
+  ctx.font = '11px system-ui, sans-serif';
+  ctx.strokeStyle = c('--grid'); ctx.fillStyle = c('--text-muted'); ctx.lineWidth = 1;
+  const ys = niceMultStep((yMax - 1) / 4);
+  ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+  for (let v = 1; v <= yMax + 1e-9; v += ys) {
+    ctx.beginPath(); ctx.moveTo(m.l, Math.round(y(v)) + 0.5); ctx.lineTo(W - m.r, Math.round(y(v)) + 0.5); ctx.stroke();
+    ctx.fillText(`${+v.toFixed(2)}×`, m.l - 8, y(v));
+  }
+  const xs = niceMultStep(tMax / 1000 / 6);
+  ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  for (let sec = 0; sec * 1000 <= tMax; sec += xs) ctx.fillText(`${+sec.toFixed(1)}s`, x(sec * 1000), H - m.b + 8);
+  if (s.phase === 'betting') return;
+
+  const color = s.phase === 'crashed' ? c('--bad') : c('--accent');
+  const N = 140;
+  ctx.beginPath();
+  for (let i = 0; i <= N; i++) { const t = (tMs * i) / N, v = Math.exp(G * t); (i ? ctx.lineTo : ctx.moveTo).call(ctx, x(t), y(v)); }
+  const grad = ctx.createLinearGradient(0, m.t, 0, m.t + ih);
+  grad.addColorStop(0, color + '55'); grad.addColorStop(1, color + '00');
+  ctx.save(); ctx.lineTo(x(tMs), y(1)); ctx.lineTo(x(0), y(1)); ctx.closePath(); ctx.fillStyle = grad; ctx.fill(); ctx.restore();
+  ctx.beginPath();
+  for (let i = 0; i <= N; i++) { const t = (tMs * i) / N, v = Math.exp(G * t); (i ? ctx.lineTo : ctx.moveTo).call(ctx, x(t), y(v)); }
+  ctx.strokeStyle = color; ctx.lineWidth = 3; ctx.lineJoin = 'round'; ctx.stroke();
+  ctx.beginPath(); ctx.arc(x(tMs), y(cur), 6, 0, Math.PI * 2); ctx.fillStyle = color; ctx.fill();
+  ctx.lineWidth = 3; ctx.strokeStyle = c('--surface-1'); ctx.stroke();
+  // Your cash-out on the curve
+  const b = play.bet;
+  if (b && b.id === s.id && b.cashedAt != null && b.cashedAt <= cur) {
+    const tb = Math.log(b.cashedAt) / G;
+    ctx.beginPath(); ctx.arc(x(tb), y(b.cashedAt), 5, 0, Math.PI * 2); ctx.fillStyle = c('--good'); ctx.fill();
+    ctx.fillStyle = c('--good'); ctx.textAlign = 'left'; ctx.textBaseline = 'bottom'; ctx.font = '600 12px system-ui, sans-serif';
+    ctx.fillText(`You ${b.cashedAt.toFixed(2)}×`, x(tb) + 8, y(b.cashedAt) - 4);
+  }
+}
+
+function playLoop() {
+  requestAnimationFrame(playLoop);
+  if (!isSandbox() || document.hidden || !play.state) return;
+  const s = play.state, b = play.bet;
+  if (s.phase === 'running' && b && b.id === s.id && b.cashedAt == null && b.auto && multNow() >= b.auto) cashOut(b.auto);
+  drawPlay();
+  updatePlayLive();
+}
+
+function initSandbox() {
+  $('srcReal').onclick = () => setSource('real');
+  $('srcSandbox').onclick = () => setSource('sandbox');
+  $('sbxBack').onclick = () => setSource('real');
+  $('playBtn').onclick = playAction;
+  $('playReset').onclick = () => {
+    play.player = { balance: PLAY_START, bets: [] };
+    savePlayer();
+    playNote(`Balance reset to ${coins(PLAY_START)}.`, 2500);
+    renderPlay();
+  };
+  document.querySelectorAll('[data-quick]').forEach((b) => (b.onclick = () => {
+    const i = $('playAmt'), v = +i.value || 0;
+    i.value = { half: Math.max(1, Math.floor(v / 2)), double: Math.max(1, v * 2), max: Math.floor(play.player.balance) }[b.dataset.quick];
+  }));
+  renderPlay();
+  requestAnimationFrame(playLoop);
+  if (S.source === 'sandbox') setSource('sandbox');
+}
+
 // ---------- connection + loading screen ----------
 
 // Steps shown while the first history loads: pending | active | done | error.
@@ -1571,22 +1894,46 @@ function connect() {
     renderLoader();
   };
   es.addEventListener('snapshot', (e) => {
-    games = JSON.parse(e.data).games;
+    const st = store.real, list = JSON.parse(e.data).games;
+    st.games.length = 0; // fill in place: `games` may point at this array
+    for (const g of list) st.games.push(g);
+    st.byId.clear();
+    for (const g of st.games) st.byId.set(g[0], g);
+    if (isSandbox()) return;
+    games = st.games; byId = st.byId;
     if (games.length) loaded(); else renderLoader();
-    byId.clear();
-    for (const g of games) byId.set(g[0], g);
     checkAlerts(null);
     generateStrategies();
     render();
   });
   es.addEventListener('games', (e) => {
     const fresh = JSON.parse(e.data); // oldest first
-    const planBefore = S.plan && games.length ? planReplay(S.plan) : null;
-    for (const g of fresh) { games.unshift(g); byId.set(g[0], g); }
+    const st = store.real, active = !isSandbox();
+    const planBefore = active && planHere() && games.length ? planReplay(S.plan) : null;
+    for (const g of fresh) { st.games.unshift(g); st.byId.set(g[0], g); }
+    if (!active) return;
     if (view.offset > 0) view.offset += fresh.length; // keep a panned chart still
     checkAlerts(fresh);
     checkPlan(planBefore);
     generateStrategies(); // plans follow the history up to this round
+    render(true);
+  });
+  // Sandbox game: live state of the current round, and each finished round.
+  es.addEventListener('sbx', (e) => onSandboxState(JSON.parse(e.data)));
+  es.addEventListener('sbx-round', (e) => {
+    const row = JSON.parse(e.data), sb = store.sandbox;
+    if (!sb.loaded) { if (sb.loading) sb.pending.push(row); return; }
+    if (sb.games.length && row[0] <= sb.games[0][0]) return;
+    const active = isSandbox();
+    const planBefore = active && planHere() && games.length ? planReplay(S.plan) : null;
+    sb.games.unshift(row);
+    sb.byId.set(row[0], row);
+    if (sb.games.length > 50000) sb.byId.delete(sb.games.pop()[0]);
+    if (!active) return;
+    if (view.offset > 0) view.offset += 1;
+    checkAlerts([row]);
+    checkPlan(planBefore);
+    generateStrategies();
     render(true);
   });
   es.addEventListener('presence', (e) => {
@@ -1630,5 +1977,6 @@ initChart();
 initDev();
 initStrategy();
 initSite();
+initSandbox();
 initControls();
 connect();

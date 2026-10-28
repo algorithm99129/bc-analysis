@@ -20,20 +20,12 @@ const DEPTH = +process.env.DEPTH || 50000; // rounds kept in memory
 const HOSTS = (process.env.BC_HOSTS || 'bc.game,bc.co,bc.fun,bcgame.top,bc.app').split(',');
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const TIMES_FILE = path.join(__dirname, 'data', 'times.json');
+const SANDBOX = process.env.SANDBOX !== '0'; // play-money crash game; SANDBOX=0 turns it off
 
 // ---------- provably fair ----------
 
-// Crash point for a round: HMAC-SHA256(key = salt, msg = hash bytes),
-// first 52 bits -> 99 / (1 - X), floored to 2 decimals, minimum 1.00.
-function crashPoint(hash, salt) {
-  const hmac = crypto.createHmac('sha256', salt).update(Buffer.from(hash, 'hex')).digest('hex');
-  const r = parseInt(hmac.slice(0, 13), 16);
-  const x = 99 / (1 - r / 2 ** 52);
-  return Math.max(1, Math.floor(x) / 100);
-}
-
-// The previous round's hash is sha256 of the current hash's hex string.
-const prevHash = (hash) => crypto.createHash('sha256').update(hash).digest('hex');
+const { crashPoint, prevHash } = require('./crash');
+const { createSandbox } = require('./sandbox');
 
 // ---------- round times ----------
 
@@ -238,6 +230,8 @@ async function poll() {
 const pack = (g) => [g.id, g.rate, g.t];
 const snapshot = () => ({ games: games.map(pack), salt, latestHash: games[0]?.hash ?? null });
 
+const sandbox = SANDBOX ? createSandbox({ file: path.join(__dirname, 'data', 'sandbox.json'), depth: DEPTH, broadcast }) : null;
+
 function broadcast(event, data) {
   const msg = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
   for (const res of clients) res.write(msg);
@@ -256,9 +250,17 @@ const server = http.createServer((req, res) => {
     const cid = url.searchParams.get('cid');
     viewers.set(res, /^[A-Za-z0-9-]{8,64}$/.test(cid || '') ? cid : crypto.randomUUID());
     res.write(`event: presence\ndata: ${JSON.stringify({ online: online() })}\n\n`);
+    const sbx = sandbox?.state();
+    if (sbx) res.write(`event: sbx\ndata: ${JSON.stringify(sbx)}\n\n`);
     schedulePresence();
     req.on('close', () => { clients.delete(res); viewers.delete(res); schedulePresence(); });
     return;
+  }
+
+  if (url.pathname === '/api/sandbox/history') {
+    if (!sandbox) return res.writeHead(404).end();
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+    return res.end(JSON.stringify(sandbox.history(Math.min(+url.searchParams.get('limit') || DEPTH, DEPTH))));
   }
 
   if (url.pathname === '/api/history') {
@@ -299,4 +301,5 @@ server.listen(PORT, HOST, () => {
   }
   if (PROXY) console.log(`using proxy ${new URL(PROXY).host}`);
   poll();
+  sandbox?.start();
 });

@@ -42,6 +42,7 @@
       <a href="#numbers">What the numbers mean</a>
       <a href="#panels">The panels</a>
       <a href="#strategy">Strategy generator</a>
+      <a href="#sandbox">Sandbox crash game</a>
       <a href="#alerts">Alerts &amp; notifications</a>
       <a href="#keys">Keyboard shortcuts</a>
       <a href="#limits">What the numbers can't tell you</a>
@@ -165,6 +166,27 @@ crash = max(1.00, floor(99 ÷ (1 − X)) ÷ 100)</pre>
           risk and in how results are spread, not in expected value. Treat them as reference, not as a way to win.</p>
       </section>
 
+      <section id="sandbox">
+        <h2>Sandbox crash game</h2>
+        <p>Switch the top bar from <b>Real</b> to <b>Sandbox</b> to play a live crash game with <b>play money</b> — no real value, no
+          sign-up, and nothing to do with BC.Game. Everyone shares the same rounds; your balance (1,000 to start) is kept in your browser
+          and can be reset at any time.</p>
+        <ul>
+          <li><b>Bet</b> during the countdown (or queue a bet for the next round), then <b>cash out</b> before the multiplier crashes —
+            or set an <b>auto cash-out</b>. <kbd>Space</kbd> places a bet or cashes out.</li>
+          <li>A cash-out only counts if it is at or below the crash point. If your click reaches the server after the crash, the bet is lost, exactly like a real game.</li>
+          <li>Rounds use the same formula and the same flight speed as the real game, so the odds are identical: every bet returns 99% of its stake on average.</li>
+        </ul>
+        <p><b>The whole dashboard follows the switch.</b> In Sandbox mode, trackers, charts, the probability board, deviation, range density,
+          strategies and alerts all use sandbox rounds — handy for trying an idea and seeing it play out live. A purple banner shows
+          while you are in Sandbox mode; switch back to Real at any time. A tracked strategy keeps to the data it was started on.</p>
+        <p><b>Provably fair.</b> The sandbox generates a chain of a million hashes before its first round and publishes the hash after the
+          last one as a <b>commitment</b>. Rounds are played backwards along the chain and each round's hash is revealed when it crashes, so
+          sha256 of a round's hash equals the previous round's hash and the results cannot be changed after the fact. The 50,000 rounds of
+          history you see on first use come from the same chain. Open <i>Provably fair</i> in the game panel for the commitment, salt and
+          the last round's hash.</p>
+      </section>
+
       <section id="alerts">
         <h2>Alerts &amp; notifications</h2>
         <ul>
@@ -210,6 +232,7 @@ crash = max(1.00, floor(99 ÷ (1 − X)) ÷ 100)</pre>
         <details><summary>Do I need an account or to connect my wallet?</summary><p>No. There is nothing to sign up for or connect. Never share your BC.Game login, wallet keys or seed phrase with anyone.</p></details>
         <details><summary>Can it predict the next round?</summary><p>No one can. Results come from a hash chain committed in advance; each round is independent. The statistics describe the past.</p></details>
         <details><summary>Is it affiliated with BC.Game?</summary><p>No. It is an independent project that reads BC.Game's public round history.</p></details>
+        <details><summary>Is the sandbox real money? Is it connected to BC.Game?</summary><p>No and no. The sandbox uses play money with no value, runs on this server only, and has no link to BC.Game or any wallet. It exists so you can practise and test ideas.</p></details>
         <details><summary>Why do older rounds have no time?</summary><p>BC.Game only reports times for the latest 100 rounds. Older rounds are rebuilt from the hash chain, which contains results but not times.</p></details>
         <details><summary>Why are my desktop alerts not showing?</summary><p>Allow notifications for the site, open it over https (or on localhost), keep the tab open, and check your system's notification settings. See <a href="#alerts">Alerts</a>.</p></details>
         <details><summary>Does my layout or tracked plan sync between devices?</summary><p>No — they are saved only in the browser you use. Each device has its own.</p></details>

@@ -19,6 +19,11 @@ No dependencies — Node 20.12+ only.
 - Round times: every real time the server sees is saved to `data/times.json` and reused after restarts.
   Older rounds rebuilt from the hash chain have no time.
 - Strategy plans are built in a Web Worker (`public/strategy-worker.js`) after every round.
+- Sandbox (`sandbox.js`): the server also runs its own shared, play-money crash game with the same formula and
+  flight speed (`crash.js`). Its rounds come from a 1,000,000-hash chain generated up front; the hash after the
+  last one is published as a commitment and each round's hash is revealed when it crashes. 50,000 rounds of
+  history come from the same chain. State is kept in `data/sandbox.json`. The dashboard's Real / Sandbox switch
+  decides which rounds every panel analyses; balances live in each visitor's browser.
 
 ## Pages
 
@@ -40,9 +45,11 @@ Contact and donation details live in one place, the `SITE` object near the end o
 | `HOST` | `0.0.0.0` | Interface to listen on (`0.0.0.0` = all, so other devices on the network can connect; `127.0.0.1` = this computer only) |
 | `POLL_MS` | `2000` | Poll interval |
 | `DEPTH` | `50000` | Rounds kept (and available for "Last N") |
+| `SANDBOX` | on | `SANDBOX=0` turns the sandbox game off |
 | `BC_HOSTS` | `bc.game,bc.co,bc.fun,bcgame.top,bc.app` | Mirror domains, tried in order |
 
 ## Endpoints
 
 - `/api/history?limit=2000` — JSON `{ id, rate, hash, endTime }`, newest first
 - `/api/history.csv` — CSV export
+- `/api/sandbox/history?limit=50000` — sandbox rounds `{ games: [[id, crash, endTime]], salt, commit }`, newest first
