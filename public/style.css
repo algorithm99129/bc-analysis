@@ -34,6 +34,10 @@
 
 * { box-sizing: border-box; }
 html, body { margin: 0; background: var(--bg); color: var(--text-primary); font-size: 14px; }
+/* Fill the window: the main area grows, so the footer sits at the bottom even on short pages. */
+body { min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; }
+body > * { min-width: 0; flex-shrink: 0; }
+body > .board, body > .loading, body > .docs-wrap { flex: 1 0 auto; }
 h1 { font-size: 17px; margin: 0; letter-spacing: .2px; }
 h2 { font-size: 14px; margin: 0; font-weight: 600; white-space: nowrap; }
 .muted { color: var(--text-muted); }
@@ -156,7 +160,7 @@ input:focus, select:focus { outline: 2px solid var(--series-lo); outline-offset:
 /* ---------- board & cards ---------- */
 .board {
   display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 16px;
-  grid-auto-flow: row dense; align-items: stretch; padding: 4px 20px 32px; /* panels in a row share its height */
+  grid-auto-flow: row dense; align-items: stretch; align-content: start; padding: 4px 20px 32px; /* panels in a row share its height; rows never stretch to fill the window */
 }
 .card {
   grid-column: span var(--span, 12);
@@ -263,7 +267,7 @@ dialog.modal[open] { animation: modal-in .22s ease-out; }
 @media (max-width: 560px) { .pay { flex-direction: column; align-items: stretch; } .qr-box { align-self: center; } .amounts { grid-template-columns: repeat(2, 1fr); } .modal-body { padding: 24px 18px 18px; } }
 
 /* ----- first-load screen ----- */
-.loading { display: flex; justify-content: center; padding: 72px 16px 48px; }
+.loading { display: flex; align-items: center; justify-content: center; padding: 40px 16px; } /* card centred in the free space */
 .load-card {
   width: min(520px, 100%); padding: 32px 32px 26px; border-radius: 18px; text-align: left;
   background: linear-gradient(180deg, #ffffff07, transparent 160px), var(--surface-1);
@@ -298,7 +302,7 @@ body.is-loading .top-controls > .field, body.is-loading .latest, body.is-loading
 .spinner { width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--surface-3); border-top-color: var(--accent); animation: spin .8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 body.is-loading .board { display: none; }
-.foot { padding: 18px 20px 28px; margin-top: 4px; border-top: 1px solid var(--border); color: var(--text-muted); font-size: 12px; display: flex; flex-wrap: wrap; gap: 10px 18px; justify-content: space-between; }
+.foot { padding: 18px 20px 28px; margin-top: auto; border-top: 1px solid var(--border); color: var(--text-muted); font-size: 12px; display: flex; flex-wrap: wrap; gap: 10px 18px; justify-content: space-between; }
 kbd { font: 600 11px/1 system-ui, sans-serif; padding: 2px 5px; border-radius: 4px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text-secondary); }
 .strip { mask-image: linear-gradient(90deg, #000 92%, transparent); }
 .card.dragging { opacity: .55; box-shadow: 0 0 0 2px var(--series-lo); }
