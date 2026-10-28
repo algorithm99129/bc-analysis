@@ -124,17 +124,17 @@ crash = max(1.00, floor(99 ÷ (1 − X)) ÷ 100)</pre>
         <h3>Overview</h3>
         <p>Median, highest and instant-crash rate of the Sample, and a bar showing how rounds split into 1.00×, 1.01–2×, 2–10×, 10–100× and 100×+
           (hover for observed vs. expected). <b>CSV</b> downloads the Sample with hashes.</p>
-        <h3>Rounds chart</h3>
+        <h3>Rounds &amp; deviation</h3>
         <p>One bar per round on a log scale; blue below the threshold, orange at or above it, green dots mark 1.00× crashes.
           Drag to scroll back through history, use the wheel or the magnifiers to zoom, and press <b>Live</b> to jump back to the newest round.
           Switch to <b>Select</b> (or hold Shift) and drag to pick a range of rounds.</p>
         <h3>Range density</h3>
         <p>For the selected range: each target's hits, density and expected density, the difference and its deviation. Type round numbers
           for an exact range, or use <b>Visible rounds</b> / <b>Sample</b>.</p>
-        <h3>Deviation</h3>
-        <p>How far each target's hit rate is from its default chance over time, in σ. <b>Rolling</b> uses the last Sample-size rounds at each point;
-          <b>Cumulative</b> counts from the start of the range. With <b>Sync with Rounds</b> on, it shows exactly the rounds of the Rounds chart,
-          each point under its bar, and pans, zooms and selects together with it.</p>
+        <p>Directly under the bars, the <b>deviation</b> chart shows how far each chosen target's hit rate is from its default chance, in σ,
+          at every round on screen — each point sits under its bar, so a run of misses or a cluster of hits lines up with its effect.
+          <b>Rolling</b> uses the last Sample-size rounds at each point; <b>Cumulative</b> counts from the first round shown. Pick up to four
+          targets with the chips. Both charts pan, zoom, select and hover together.</p>
         <h3>Probability board</h3>
         <p>Every target in one table: default chance, average gap, hits vs. expected, observed rate, deviation, adjusted gap, Since, Due %,
           Next in, status and longest gap. Add or remove targets, and turn on an alert per row (🔔) with its own threshold — for example

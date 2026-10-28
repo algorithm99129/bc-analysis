@@ -470,10 +470,13 @@ tbody tr:hover td { background: #ffffff06; }
 .chart { width: 100%; height: 260px; cursor: grab; touch-action: none; user-select: none; }
 .chart.grabbing { cursor: grabbing; }
 .chart canvas { display: block; width: 100%; height: 100%; }
-.dev-chart { cursor: crosshair; height: 280px; }
-.dev-chart.synced { cursor: grab; }
-.dev-chart.synced.grabbing { cursor: grabbing; }
-.dev-chart.synced.selecting { cursor: crosshair; }
+/* Deviation chart directly under the rounds chart, same x axis */
+.dev-bar { display: flex; align-items: center; gap: 10px 14px; flex-wrap: wrap; margin: 12px 0 6px; padding-top: 12px; border-top: 1px dashed var(--border); }
+.dev-title { font-size: 13px; font-weight: 600; color: var(--text-primary); cursor: help; white-space: nowrap; }
+.dev-bar .chips { margin: 0; flex: 1; }
+.dev-chart { height: 220px; cursor: grab; }
+.dev-chart.grabbing { cursor: grabbing; }
+.dev-chart.selecting { cursor: crosshair; }
 select:disabled { opacity: .45; }
 .chart.selecting { cursor: crosshair; }
 

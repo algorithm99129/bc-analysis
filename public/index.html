@@ -219,7 +219,7 @@
     <article class="card" data-card="chart" data-span="12">
       <header class="card-head">
         <span class="grip" data-tip="Drag to move"><svg class="ic" aria-hidden="true"><use href="#i-grip"/></svg></span>
-        <h2>Rounds <span id="chartRangeLabel" class="muted mono"></span></h2>
+        <h2>Rounds &amp; deviation <span id="chartRangeLabel" class="muted mono"></span></h2>
         <span id="liveBadge" class="badge">LIVE</span>
         <div class="tools">
           <div class="legend">
@@ -241,8 +241,17 @@
       </header>
       <div class="card-body">
         <div class="chart" id="chart"><canvas id="chartCanvas"></canvas></div>
+        <div class="dev-bar">
+          <span class="dev-title" data-tip="Deviation = (hits − expected) ÷ standard deviation, at each round below its bar. Above 0: the target hit more often than its default chance; below 0: less often. Shaded bands mark ±1σ and ±2σ — inside ±2σ is ordinary variation">Deviation <span class="muted">σ</span></span>
+          <div class="chips" id="devChips" aria-label="Targets to plot"></div>
+          <select id="devMode" aria-label="Deviation mode" data-tip="Rolling: each point uses the last Sample-size rounds. Cumulative: everything from the first round on screen">
+            <option value="roll">Rolling (sample window)</option>
+            <option value="cum">Cumulative from first round shown</option>
+          </select>
+        </div>
+        <div class="chart dev-chart" id="devChart"><canvas id="devCanvas"></canvas></div>
         <input id="chartScroll" class="scroll" type="range" min="0" max="0" value="0" aria-label="Scroll through history">
-        <p class="hint">Drag to pan · <kbd>Shift</kbd>+drag or Select mode to measure a range · wheel to zoom · double-click for live ·
+        <p class="hint">Both charts show the same rounds: each deviation point sits under its bar. Drag either chart to pan · <kbd>Shift</kbd>+drag or Select mode to measure a range · wheel to zoom · double-click for live ·
           keys: <kbd>P</kbd> pan <kbd>S</kbd> select <kbd>L</kbd> live <kbd>+</kbd>/<kbd>−</kbd> zoom <kbd>Esc</kbd> clear selection</p>
 
         <section class="density" aria-label="Density of the selected range">
@@ -272,30 +281,6 @@
           </div>
           <p class="note">Density = hits ÷ rounds × 100. In a short range large differences are normal; the Deviation column shows whether a difference is unusual for the range size.</p>
         </section>
-      </div>
-    </article>
-
-    <article class="card" data-card="dev" data-span="12">
-      <header class="card-head">
-        <span class="grip" data-tip="Drag to move"><svg class="ic" aria-hidden="true"><use href="#i-grip"/></svg></span>
-        <h2>Deviation</h2>
-        <div class="tools">
-          <button id="devSync" class="btn toggle" aria-pressed="true"
-            data-tip="Show exactly the rounds on the Rounds chart, each point under its bar. Pan, zoom, select and hover move both charts"><svg class="ic" aria-hidden="true"><use href="#i-link"/></svg>Sync with Rounds</button>
-          <select id="devMode" aria-label="Deviation mode" data-tip="Rolling: each point uses the last Sample-size rounds. Cumulative: everything from the start of the range">
-            <option value="roll">Rolling (sample window)</option>
-            <option value="cum">Cumulative from range start</option>
-          </select>
-          <select id="devRange" aria-label="Rounds shown"></select>
-          <button class="icon-btn size" data-tip="Change panel width"><svg class="ic" aria-hidden="true"><use href="#i-width"/></svg></button>
-        </div>
-      </header>
-      <div class="card-body">
-        <div class="chips" id="devChips" aria-label="Targets to plot"></div>
-        <div class="chart dev-chart" id="devChart"><canvas id="devCanvas"></canvas></div>
-        <p class="hint" id="devHint"></p>
-        <p class="hint">Deviation = (hits − expected) ÷ standard deviation. Above 0: the target has hit more often than its default chance; below 0: less often.
-          Shaded bands mark ±1σ and ±2σ — inside ±2σ is ordinary variation.</p>
       </div>
     </article>
 

@@ -27,8 +27,6 @@ const DEFAULTS = {
   devMode: 'roll',
   chartMode: 'pan', // 'pan' | 'select'
   sel: null, // selected range on the Rounds chart: { from, to } round ids
-  devRange: 5000,
-  devSync: true, // Deviation chart shows the same rounds as the Rounds chart
   source: 'real', // 'real' = BC.Game rounds, 'sandbox' = the play-money game
   layout: null, // [[cardId, span], ...]
 };
@@ -535,7 +533,7 @@ function bindRoundsPointer(el, geomOf, tipOf, interactive = () => true, hoverOf 
 function initChart() {
   // Rounds tooltip also lists the deviation lines at that round while the charts are synced.
   bindRoundsPointer($('chart'), () => geom,
-    (i, g) => gameTip(g.data[i]) + (S.devSync && devGeom?.series.length ? `<br>${devTipRows(i)}` : ''));
+    (i, g) => gameTip(g.data[i]) + (devGeom?.series.length ? `<br>${devTipRows(i)}` : ''));
   $('chartScroll').addEventListener('input', (e) => { view.offset = +e.target.max - +e.target.value; renderCharts(); });
   $('zoomIn').onclick = () => { view.count /= 1.5; renderCharts(); };
   $('zoomOut').onclick = () => { view.count *= 1.5; renderCharts(); };
@@ -616,7 +614,6 @@ function renderDensity() {
 // ---------- deviation chart ----------
 
 const DEV_COLORS = ['--cat-1', '--cat-2', '--cat-3', '--cat-4'];
-const dev = { hover: -1 }; // hover index when not synced (synced charts share view.hover)
 let devGeom = null;
 let devCache = { key: '', series: null };
 
@@ -660,10 +657,7 @@ function renderDev() {
   const wrap = $('devChart'), cv = $('devCanvas');
   const W = wrap.clientWidth, H = wrap.clientHeight;
   $('devMode').value = S.devMode;
-  $('devSync').setAttribute('aria-pressed', S.devSync);
-  $('devRange').hidden = S.devSync; // the Rounds chart decides the range while synced
-  wrap.classList.toggle('synced', S.devSync);
-  wrap.classList.toggle('selecting', S.devSync && S.chartMode === 'select');
+  wrap.classList.toggle('selecting', S.chartMode === 'select');
 
   // Target chips: colour comes from the target's fixed slot.
   const css = getComputedStyle(document.documentElement);
@@ -677,25 +671,9 @@ function renderDev() {
   if (!W || !games.length) return;
 
   const w = win(), mode = S.devMode, lead = mode === 'roll' ? w - 1 : 0;
-  let offset, span;
-  if (S.devSync) {
-    // Exactly the rounds on the Rounds chart (renderChart has already clamped view).
-    offset = view.offset;
-    span = Math.min(view.count, games.length - offset);
-    $('devHint').textContent = Math.abs($('chart').clientWidth - W) > 2
-      ? 'Give this panel the same width as the Rounds chart (width button, top right) so the rounds line up exactly.'
-      : 'Synced with the Rounds chart: same rounds, same positions. Drag, zoom, select and hover work on both.';
-  } else {
-    const maxSpan = games.length - lead;
-    const ranges = [2000, 5000, 10000, 20000].filter((n) => n < maxSpan).concat(maxSpan);
-    const rsel = $('devRange');
-    const rhtml = ranges.map((n) => `<option value="${n}">${n === maxSpan ? `All (${int(n)})` : `Last ${int(n)}`}</option>`).join('');
-    if (rsel.dataset.html !== rhtml) { rsel.innerHTML = rhtml; rsel.dataset.html = rhtml; }
-    offset = 0;
-    span = Math.min(S.devRange, maxSpan);
-    rsel.value = ranges.includes(span) ? span : maxSpan;
-    $('devHint').textContent = 'Not synced: showing its own range. Turn on Sync with Rounds to line it up with the Rounds chart.';
-  }
+  // Exactly the rounds on the Rounds chart above (renderChart has already clamped view).
+  const offset = view.offset;
+  const span = Math.min(view.count, games.length - offset);
 
   const dpr = devicePixelRatio || 1;
   if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)) { cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
@@ -729,7 +707,7 @@ function renderDev() {
   const y = (v) => m.t + ih / 2 - (v / lim) * (ih / 2);
 
   // Selected range (synced): same band as on the Rounds chart.
-  if (S.devSync && S.sel) {
+  if (S.sel) {
     const i0 = data.findIndex((g) => g[0] >= S.sel.from), i1 = data.findLastIndex((g) => g[0] <= S.sel.to);
     if (i0 >= 0 && i1 >= i0) {
       const x0 = m.l + i0 * step, x1 = m.l + (i1 + 1) * step;
@@ -770,7 +748,7 @@ function renderDev() {
     ctx.stroke();
   }
 
-  const hover = S.devSync ? view.hover : dev.hover;
+  const hover = view.hover;
   if (hover >= 0 && hover < span) {
     const hx = xAt(hover);
     ctx.strokeStyle = c('--text-muted'); ctx.lineWidth = 1; ctx.setLineDash([2, 3]);
@@ -793,10 +771,8 @@ function initDev() {
   // Synced: the same drag / wheel / select / hover handling as the Rounds chart.
   // Not synced: hover only.
   bindRoundsPointer($('devChart'), () => devGeom, (i, g) => `<b>#${g.data[i][0]}</b> ${fmt(g.data[i][1])}<br>${devTipRows(i)}`,
-    () => S.devSync, () => (S.devSync ? view : dev));
-  $('devSync').onclick = () => { S.devSync = !S.devSync; save(); render(); };
+    () => true, () => view);
   $('devMode').addEventListener('change', (e) => { S.devMode = e.target.value; save(); render(); });
-  $('devRange').addEventListener('change', (e) => { S.devRange = +e.target.value; save(); render(); });
   $('devChips').addEventListener('click', (e) => {
     const b = e.target.closest('.chip');
     if (!b) return;
